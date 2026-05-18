@@ -1,0 +1,231 @@
+:root {
+  /* Color System */
+  --bg-amoled: #000000;
+  --bg-off-black: #0a0a0a;
+  --bg-surface: #121212;
+  --bg-surface-elevated: #1a1a1a;
+  --bg-surface-hover: #262626;
+
+  /* Neutrals */
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --border-subtle: #2e2e2e;
+  --border-strong: #4b4b4b;
+
+  /* Accents */
+  --accent-green: #32d74b;
+  --accent-green-dim: rgba(50, 215, 75, 0.15);
+  --accent-orange: #ff9f0a;
+  --accent-orange-dim: rgba(255, 159, 10, 0.15);
+  --accent-red: #ff453a;
+  --accent-red-dim: rgba(255, 69, 58, 0.15);
+  --accent-blue: #0a84ff;
+  --accent-blue-dim: rgba(10, 132, 255, 0.15);
+
+  /* Shadows & Glass */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.5);
+  --glass-bg: rgba(26, 26, 26, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.05);
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  /* Layout */
+  --spacing-unit: 8px;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
+  --max-width: 500px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-amoled);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background-color: var(--bg-off-black);
+}
+
+.app-container {
+  width: 100%;
+  max-width: var(--max-width);
+  background-color: var(--bg-amoled);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography Utilities */
+.text-h1 { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.2; }
+.text-h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.3; }
+.text-h3 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.4; }
+.text-body { font-size: 16px; font-weight: 400; color: var(--text-secondary); }
+.text-label { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+.text-caption { font-size: 12px; font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.5px; text-transform: uppercase; }
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-green { color: var(--accent-green); }
+.text-orange { color: var(--accent-orange); }
+.text-red { color: var(--accent-red); }
+.text-blue { color: var(--accent-blue); }
+
+/* Layout Utilities */
+.p-screen { padding: 24px; }
+.pt-screen { padding-top: 24px; }
+.pb-nav { padding-bottom: 100px; } /* Space for bottom nav */
+.mb-section { margin-bottom: 32px; }
+.gap-sm { gap: 8px; }
+.gap-md { gap: 16px; }
+.gap-lg { gap: 24px; }
+
+.flex-row { display: flex; align-items: center; }
+.flex-col { display: flex; flex-direction: column; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.align-start { align-items: flex-start; }
+.flex-1 { flex: 1; }
+
+/* Components */
+.card {
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--border-subtle);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease;
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+.card-elevated {
+  background-color: var(--bg-surface-elevated);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--glass-border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 24px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 16px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn-primary {
+  background-color: var(--text-primary);
+  color: var(--bg-amoled);
+}
+
+.btn-secondary {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+}
+
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border: none;
+  cursor: pointer;
+}
+
+/* Specific UI Elements */
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-surface-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.progress-ring-circle {
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  stroke-linecap: round;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-green { background-color: var(--accent-green-dim); color: var(--accent-green); }
+.badge-orange { background-color: var(--accent-orange-dim); color: var(--accent-orange); }
+.badge-red { background-color: var(--accent-red-dim); color: var(--accent-red); }
+
+/* Animation Utils */
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Hide scrollbar for clean UI */
+::-webkit-scrollbar {
+  display: none;
+}
