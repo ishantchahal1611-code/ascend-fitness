@@ -1,4 +1,4 @@
-import { Home, Dumbbell, Utensils, Activity, Trophy } from 'lucide-react';
+import { Home, Dumbbell, Utensils, Activity, Settings } from 'lucide-react';
 
 export default function BottomNav({ activeTab, setActiveTab }) {
   const navItems = [
@@ -6,7 +6,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
     { id: 'workout', icon: Dumbbell, label: 'Workout' },
     { id: 'calories', icon: Utensils, label: 'Diet' },
     { id: 'activity', icon: Activity, label: 'Activity' },
-    { id: 'progress', icon: Trophy, label: 'Progress' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
   return (
@@ -28,6 +28,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
           return (
             <button
               key={item.id}
+              id={`nav-${item.id}`}
               onClick={() => setActiveTab(item.id)}
               style={{
                 display: 'flex',
