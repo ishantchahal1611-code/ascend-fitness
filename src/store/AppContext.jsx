@@ -13,18 +13,17 @@ function load(key, def) {
 function save(key, val) { localStorage.setItem(`ascend_${key}`, JSON.stringify(val)); }
 
 export function AppProvider({ children }) {
-  // ── Settings ──
-  const [theme, setThemeRaw] = useState(() => load('theme', 'dark'));
-  const [units, setUnitsRaw] = useState(() => load('units', { weight: 'kg', distance: 'km' }));
-  const [goals, setGoalsRaw] = useState(() => load('goals', { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 }));
-  const [profile, setProfileRaw] = useState(() => load('profile', { name: 'User', age: 25, height: 175, gender: 'Other' }));
-  const [notifications, setNotificationsRaw] = useState(() => load('notifications', { workout: true, meals: true, water: true, steps: true }));
+  const [theme, setTheme] = useState(() => load('theme', 'dark'));
+  const [units, setUnits] = useState(() => load('units', { weight: 'kg', distance: 'km' }));
+  const [goals, setGoals] = useState(() => load('goals', { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 }));
+  const [profile, setProfile] = useState(() => load('profile', { name: 'User', age: 25, height: 175, gender: 'Other' }));
+  const [notifications, setNotifications] = useState(() => load('notifications', { workout: true, meals: true, water: true, steps: true }));
 
-  const setTheme = useCallback(v => { setThemeRaw(v); save('theme', v); }, []);
-  const setUnits = useCallback(v => { setUnitsRaw(v); save('units', v); }, []);
-  const setGoals = useCallback(v => { setGoalsRaw(v); save('goals', v); }, []);
-  const setProfile = useCallback(v => { setProfileRaw(v); save('profile', v); }, []);
-  const setNotifications = useCallback(v => { setNotificationsRaw(v); save('notifications', v); }, []);
+  useEffect(() => save('theme', theme), [theme]);
+  useEffect(() => save('units', units), [units]);
+  useEffect(() => save('goals', goals), [goals]);
+  useEffect(() => save('profile', profile), [profile]);
+  useEffect(() => save('notifications', notifications), [notifications]);
 
   // Resolve theme
   const resolvedTheme = useMemo(() => {
@@ -42,20 +41,23 @@ export function AppProvider({ children }) {
   const [activePlanId, setActivePlanId] = useState(() => load('activePlanId', 'ppl'));
   const [customPlans, setCustomPlans] = useState(() => load('customPlans', []));
 
+  useEffect(() => save('activePlanId', activePlanId), [activePlanId]);
+  useEffect(() => save('customPlans', customPlans), [customPlans]);
+
   const allPlans = useMemo(() => [...WORKOUT_TEMPLATES, ...customPlans], [customPlans]);
   const activePlan = useMemo(() => allPlans.find(p => p.id === activePlanId) || allPlans[0], [allPlans, activePlanId]);
 
-  const setActivePlan = useCallback(id => { setActivePlanId(id); save('activePlanId', id); }, []);
+  const setActivePlan = setActivePlanId;
   const addCustomPlan = useCallback(plan => {
-    setCustomPlans(prev => { const n = [...prev, { ...plan, id: uid() }]; save('customPlans', n); return n; });
+    setCustomPlans(prev => [...prev, { ...plan, id: uid() }]);
   }, []);
   const editCustomPlan = useCallback((id, updates) => {
-    setCustomPlans(prev => { const n = prev.map(p => p.id === id ? { ...p, ...updates } : p); save('customPlans', n); return n; });
+    setCustomPlans(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   }, []);
   const deleteCustomPlan = useCallback(id => {
-    setCustomPlans(prev => { const n = prev.filter(p => p.id !== id); save('customPlans', n); return n; });
-    if (activePlanId === id) setActivePlan('ppl');
-  }, [activePlanId, setActivePlan]);
+    setCustomPlans(prev => prev.filter(p => p.id !== id));
+    if (activePlanId === id) setActivePlanId('ppl');
+  }, [activePlanId]);
   const duplicatePlan = useCallback(id => {
     const src = allPlans.find(p => p.id === id);
     if (src) addCustomPlan({ ...src, name: src.name + ' (Copy)', shortName: src.shortName + '*' });
@@ -73,8 +75,19 @@ export function AppProvider({ children }) {
   }, [activePlan, todayScheduleLabel]);
 
   // ── Active Workout Session ──
-  const [activeSession, setActiveSession] = useState(null);
-  const [restTimer, setRestTimer] = useState({ active: false, remaining: 0, duration: 90 });
+  const [activeSession, setActiveSession] = useState(() => load('activeSession', null));
+  const [restTimer, setRestTimer] = useState(() => {
+    const saved = load('restTimer', { active: false, remaining: 0, duration: 90, endTime: null });
+    if (saved.active && saved.endTime) {
+      const rem = Math.ceil((saved.endTime - Date.now()) / 1000);
+      if (rem > 0) return { ...saved, remaining: rem };
+      return { active: false, remaining: 0, duration: 90, endTime: null };
+    }
+    return saved;
+  });
+
+  useEffect(() => save('activeSession', activeSession), [activeSession]);
+  useEffect(() => save('restTimer', restTimer), [restTimer]);
 
   const startWorkoutSession = useCallback((dayData) => {
     const exercises = dayData.exercises.map(ex => ({
@@ -134,11 +147,12 @@ export function AppProvider({ children }) {
   }, []);
 
   const startRestTimer = useCallback((dur) => {
-    setRestTimer({ active: true, remaining: dur || 90, duration: dur || 90 });
+    const duration = dur || 90;
+    setRestTimer({ active: true, remaining: duration, duration, endTime: Date.now() + duration * 1000 });
   }, []);
 
   const cancelRestTimer = useCallback(() => {
-    setRestTimer(prev => ({ ...prev, active: false, remaining: 0 }));
+    setRestTimer(prev => ({ ...prev, active: false, remaining: 0, endTime: null }));
   }, []);
 
   // Rest timer countdown
@@ -146,7 +160,7 @@ export function AppProvider({ children }) {
     if (!restTimer.active || restTimer.remaining <= 0) return;
     const t = setInterval(() => {
       setRestTimer(prev => {
-        if (prev.remaining <= 1) return { ...prev, active: false, remaining: 0 };
+        if (prev.remaining <= 1) return { ...prev, active: false, remaining: 0, endTime: null };
         return { ...prev, remaining: prev.remaining - 1 };
       });
     }, 1000);
@@ -156,6 +170,9 @@ export function AppProvider({ children }) {
   // ── Workout History ──
   const [workoutHistory, setWorkoutHistory] = useState(() => load('workoutHistory', DEFAULT_WORKOUT_HISTORY));
   const [personalRecords, setPersonalRecords] = useState(() => load('prs', {}));
+
+  useEffect(() => save('workoutHistory', workoutHistory), [workoutHistory]);
+  useEffect(() => save('prs', personalRecords), [personalRecords]);
 
   const finishWorkout = useCallback(() => {
     if (!activeSession) return;
@@ -172,9 +189,8 @@ export function AppProvider({ children }) {
       });
     });
     const entry = { id: uid(), planName: activeSession.dayName, date: getToday(), duration: dur || 1, exercises: activeSession.exercises.length, totalVolume: totalVol };
-    setWorkoutHistory(prev => { const n = [entry, ...prev]; save('workoutHistory', n); return n; });
+    setWorkoutHistory(prev => [entry, ...prev]);
     setPersonalRecords(newPRs);
-    save('prs', newPRs);
     setActiveSession(null);
     cancelRestTimer();
   }, [activeSession, personalRecords, cancelRestTimer]);
@@ -185,38 +201,37 @@ export function AppProvider({ children }) {
   const [mealsByDate, setMealsByDate] = useState(() => load('meals', { [getToday()]: DEFAULT_MEALS }));
   const [favoriteFoods, setFavoriteFoods] = useState(() => load('favFoods', []));
 
+  useEffect(() => save('meals', mealsByDate), [mealsByDate]);
+  useEffect(() => save('favFoods', favoriteFoods), [favoriteFoods]);
+
   const todayMeals = mealsByDate[getToday()] || [];
 
   const addMeal = useCallback((meal) => {
     const today = getToday();
     setMealsByDate(prev => {
       const dayMeals = prev[today] || [];
-      const n = { ...prev, [today]: [...dayMeals, { ...meal, id: uid() }] };
-      save('meals', n); return n;
+      return { ...prev, [today]: [...dayMeals, { ...meal, id: uid() }] };
     });
   }, []);
 
   const removeMeal = useCallback((mealId) => {
     const today = getToday();
     setMealsByDate(prev => {
-      const n = { ...prev, [today]: (prev[today] || []).filter(m => m.id !== mealId) };
-      save('meals', n); return n;
+      return { ...prev, [today]: (prev[today] || []).filter(m => m.id !== mealId) };
     });
   }, []);
 
   const editMeal = useCallback((mealId, updates) => {
     const today = getToday();
     setMealsByDate(prev => {
-      const n = { ...prev, [today]: (prev[today] || []).map(m => m.id === mealId ? { ...m, ...updates } : m) };
-      save('meals', n); return n;
+      return { ...prev, [today]: (prev[today] || []).map(m => m.id === mealId ? { ...m, ...updates } : m) };
     });
   }, []);
 
   const toggleFavorite = useCallback((food) => {
     setFavoriteFoods(prev => {
       const exists = prev.find(f => f.id === food.id);
-      const n = exists ? prev.filter(f => f.id !== food.id) : [...prev, food];
-      save('favFoods', n); return n;
+      return exists ? prev.filter(f => f.id !== food.id) : [...prev, food];
     });
   }, []);
 
@@ -232,12 +247,13 @@ export function AppProvider({ children }) {
   // ── Water ──
   const [waterByDate, setWaterByDate] = useState(() => load('water', { [getToday()]: 1.5 }));
   const todayWater = waterByDate[getToday()] || 0;
+  
+  useEffect(() => save('water', waterByDate), [waterByDate]);
 
   const addWater = useCallback((amount) => {
     const today = getToday();
     setWaterByDate(prev => {
-      const n = { ...prev, [today]: Math.max(0, (prev[today] || 0) + amount) };
-      save('water', n); return n;
+      return { ...prev, [today]: Math.max(0, (prev[today] || 0) + amount) };
     });
   }, []);
 
@@ -245,12 +261,13 @@ export function AppProvider({ children }) {
   const [bodyweightLog, setBodyweightLog] = useState(() => load('bodyweight', DEFAULT_BODYWEIGHT));
   const currentWeight = bodyweightLog[bodyweightLog.length - 1]?.weight || 78;
 
+  useEffect(() => save('bodyweight', bodyweightLog), [bodyweightLog]);
+
   const addBodyweight = useCallback((weight) => {
     setBodyweightLog(prev => {
       const today = getToday();
       const filtered = prev.filter(e => e.date !== today);
-      const n = [...filtered, { date: today, weight }];
-      save('bodyweight', n); return n;
+      return [...filtered, { date: today, weight }];
     });
   }, []);
 
@@ -258,17 +275,21 @@ export function AppProvider({ children }) {
   const [stepsByDate, setStepsByDate] = useState(() => load('steps', { [getToday()]: 6432 }));
   const todaySteps = stepsByDate[getToday()] || 0;
 
+  useEffect(() => save('steps', stepsByDate), [stepsByDate]);
+
   const addSteps = useCallback((count) => {
     const today = getToday();
     setStepsByDate(prev => {
-      const n = { ...prev, [today]: (prev[today] || 0) + count };
-      save('steps', n); return n;
+      return { ...prev, [today]: (prev[today] || 0) + count };
     });
   }, []);
 
   // ── Activities ──
   const [activities, setActivities] = useState(() => load('activities', DEFAULT_ACTIVITIES));
-  const [liveActivity, setLiveActivity] = useState(null);
+  const [liveActivity, setLiveActivity] = useState(() => load('liveActivity', null));
+
+  useEffect(() => save('activities', activities), [activities]);
+  useEffect(() => save('liveActivity', liveActivity), [liveActivity]);
 
   const startLiveActivity = useCallback((type) => {
     setLiveActivity({ type, label: type === 'run' ? 'Running' : type === 'walk' ? 'Walking' : 'Cycling', startTime: Date.now(), distance: 0, elapsed: 0 });
@@ -287,7 +308,7 @@ export function AppProvider({ children }) {
       date: getToday(), distance: parseFloat(dist.toFixed(1)),
       duration: dur, pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`, calories: cal,
     };
-    setActivities(prev => { const n = [entry, ...prev]; save('activities', n); return n; });
+    setActivities(prev => [entry, ...prev]);
     setLiveActivity(null);
   }, [liveActivity]);
 

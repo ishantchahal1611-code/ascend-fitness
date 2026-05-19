@@ -56,15 +56,10 @@ function LiveSession({ activity, onStop, onCancel }) {
           <div style={{ fontSize: 32, fontWeight: 700, marginTop: 4 }}>{paceMin}:{String(paceSec).padStart(2, '0')}</div>
           <span className="text-label">/km</span>
         </div>
-        <div className="card" style={{ padding: 24, textAlign: 'center' }}>
+        <div className="card" style={{ padding: 24, textAlign: 'center', gridColumn: 'span 2' }}>
           <span className="text-caption" style={{ color: typeColor }}>Calories</span>
           <div style={{ fontSize: 32, fontWeight: 700, marginTop: 4 }}>{cal}</div>
           <span className="text-label">kcal</span>
-        </div>
-        <div className="card" style={{ padding: 24, textAlign: 'center' }}>
-          <span className="text-caption" style={{ color: typeColor }}>Heart Rate</span>
-          <div style={{ fontSize: 32, fontWeight: 700, marginTop: 4 }}>{120 + Math.floor(Math.sin(elapsed / 10) * 15)}</div>
-          <span className="text-label">bpm</span>
         </div>
       </div>
 

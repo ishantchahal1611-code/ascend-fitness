@@ -30,7 +30,7 @@ function SettingRow({ icon: Icon, iconColor, label, children, sub }) {
   );
 }
 
-function EditGoalModal({ label, value, unit, onSave, onClose, step = 1 }) {
+function EditGoalModal({ label, value, unit, onSave, onClose, step = 1, max }) {
   const [val, setVal] = useState(value);
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
@@ -49,7 +49,7 @@ function EditGoalModal({ label, value, unit, onSave, onClose, step = 1 }) {
             </div>
             <button className="btn-icon" style={{ width: 48, height: 48, fontSize: 24 }} onClick={() => setVal(v => v + step)}>+</button>
           </div>
-          <input type="range" min={step} max={step > 1 ? 20000 : 10} step={step} value={val} onChange={e => setVal(parseFloat(e.target.value))}
+          <input type="range" min={step} max={max || (step > 1 ? 20000 : 10)} step={step} value={val} onChange={e => setVal(parseFloat(e.target.value))}
             style={{ width: '100%', accentColor: 'var(--accent-blue)' }} />
         </div>
       </div>
@@ -188,22 +188,32 @@ export default function Settings() {
         <span className="text-caption" style={{ marginBottom: 12, display: 'block' }}>Daily Goals</span>
         <div className="card" style={{ padding: '4px 20px' }}>
           <SettingRow icon={Flame} iconColor="#ff453a" label="Calories" sub={`${goals.calories} kcal`}>
-            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'calories', label: 'Daily Calorie Goal', value: goals.calories, unit: 'kcal', step: 50 })}>
+            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'calories', label: 'Daily Calorie Goal', value: goals.calories, unit: 'kcal', step: 50, max: 10000 })}>
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           </SettingRow>
           <SettingRow icon={Target} iconColor="#0a84ff" label="Protein" sub={`${goals.protein}g`}>
-            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'protein', label: 'Daily Protein Goal', value: goals.protein, unit: 'grams', step: 5 })}>
+            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'protein', label: 'Daily Protein Goal', value: goals.protein, unit: 'grams', step: 5, max: 300 })}>
+              <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
+            </button>
+          </SettingRow>
+          <SettingRow icon={Target} iconColor="#ff9f0a" label="Carbs" sub={`${goals.carbs}g`}>
+            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'carbs', label: 'Daily Carbs Goal', value: goals.carbs, unit: 'grams', step: 5, max: 500 })}>
+              <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
+            </button>
+          </SettingRow>
+          <SettingRow icon={Target} iconColor="#ffd60a" label="Fats" sub={`${goals.fats}g`}>
+            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'fats', label: 'Daily Fats Goal', value: goals.fats, unit: 'grams', step: 5, max: 200 })}>
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           </SettingRow>
           <SettingRow icon={Droplets} iconColor="#007aff" label="Water" sub={`${goals.water}L`}>
-            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'water', label: 'Daily Water Goal', value: goals.water, unit: 'liters', step: 0.5 })}>
+            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'water', label: 'Daily Water Goal', value: goals.water, unit: 'liters', step: 0.5, max: 10 })}>
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           </SettingRow>
           <SettingRow icon={Footprints} iconColor="#32d74b" label="Steps" sub={goals.steps.toLocaleString()}>
-            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'steps', label: 'Daily Step Goal', value: goals.steps, unit: 'steps', step: 500 })}>
+            <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'steps', label: 'Daily Step Goal', value: goals.steps, unit: 'steps', step: 500, max: 50000 })}>
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           </SettingRow>
@@ -250,6 +260,7 @@ export default function Settings() {
           value={editGoal.value}
           unit={editGoal.unit}
           step={editGoal.step}
+          max={editGoal.max}
           onSave={v => setGoals({ ...goals, [editGoal.key]: v })}
           onClose={() => setEditGoal(null)}
         />
