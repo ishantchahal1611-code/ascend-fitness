@@ -1,19 +1,26 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, ChevronRight, Play, X, Dumbbell, History, Repeat, Trash2, Check, Clock, Copy, Award, Timer } from 'lucide-react';
+import { Calendar, ChevronRight, Play, X, Dumbbell, History, Repeat, Trash2, Check, Clock, Copy, Award, Timer, Plus } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { getExercise, WORKOUT_TEMPLATES } from '../data/presets';
 
-/* ── Active Workout Session ── */
-function ActiveSession({ session, onToggleSet, onUpdateSet, onAddSet, onRemoveSet, onFinish, onCancel, restTimer, onStartRest, onCancelRest }) {
-  const elapsed = Math.max(0, Math.floor((Date.now() - session.startTime) / 1000));
-  const [tick, setTick] = useState(0);
-  // Re-render every second for elapsed timer
-  useState(() => { const t = setInterval(() => setTick(v => v + 1), 1000); return () => clearInterval(t); });
+const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  const now = Math.floor((Date.now() - session.startTime) / 1000);
-  const mins = Math.floor(now / 60);
-  const secs = now % 60;
+/* ── Active Workout Session ── */
+function ActiveSession({ session, onToggleSet, onUpdateSet, onAddSet, onRemoveSet, onFinish, onCancel, restTimer, onStartRest }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const updateTime = () => {
+      setElapsed(Math.max(0, Math.floor((Date.now() - session.startTime) / 1000)));
+    };
+    updateTime();
+    const t = setInterval(updateTime, 1000);
+    return () => clearInterval(t);
+  }, [session.startTime]);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
 
   const totalSets = session.exercises.reduce((s, e) => s + e.loggedSets.length, 0);
   const doneSets = session.exercises.reduce((s, e) => s + e.loggedSets.filter(s2 => s2.completed).length, 0);
@@ -209,7 +216,7 @@ function PRSection({ personalRecords }) {
 export default function WorkoutPlanner() {
   const {
     activePlan, activePlanId, setActivePlan, allPlans, duplicatePlan, deleteCustomPlan,
-    todayDayIndex, todayScheduleLabel, todayWorkout,
+    todayWorkout,
     activeSession, startWorkoutSession, toggleSetComplete, updateSetData, addSetToExercise, removeSetFromExercise,
     finishWorkout, cancelWorkout, restTimer, startRestTimer, cancelRestTimer,
     workoutHistory, personalRecords,
@@ -219,13 +226,6 @@ export default function WorkoutPlanner() {
   const [showHistory, setShowHistory] = useState(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
 
-  // If active session, show that instead
-  if (activeSession) {
-    return <ActiveSession session={activeSession} onToggleSet={toggleSetComplete} onUpdateSet={updateSetData}
-      onAddSet={addSetToExercise} onRemoveSet={removeSetFromExercise} onFinish={finishWorkout} onCancel={cancelWorkout}
-      restTimer={restTimer} onStartRest={startRestTimer} onCancelRest={cancelRestTimer} />;
-  }
-
   const getToday = () => new Date().toISOString().split('T')[0];
 
   // Check if a workout has been completed on the selectedDate
@@ -233,15 +233,13 @@ export default function WorkoutPlanner() {
     return workoutHistory.find(w => w.date === selectedDate) || null;
   }, [workoutHistory, selectedDate]);
 
-  // Calculate Monday of the current week (local time)
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const todayDateObj = new Date();
-  const todayDay = todayDateObj.getDay();
-  const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
-  const mondayDate = new Date(todayDateObj);
-  mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
-
   const weekDays = useMemo(() => {
+    const todayDateObj = new Date();
+    const todayDay = todayDateObj.getDay();
+    const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
+    const mondayDate = new Date(todayDateObj);
+    mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
+
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(mondayDate);
       d.setDate(mondayDate.getDate() + i);
@@ -268,6 +266,13 @@ export default function WorkoutPlanner() {
   }, [selectedDate, workoutHistory, mealsByDate, activePlan]);
 
   const todayDayData = todayWorkout;
+
+  // If active session, show that instead
+  if (activeSession) {
+    return <ActiveSession session={activeSession} onToggleSet={toggleSetComplete} onUpdateSet={updateSetData}
+      onAddSet={addSetToExercise} onRemoveSet={removeSetFromExercise} onFinish={finishWorkout} onCancel={cancelWorkout}
+      restTimer={restTimer} onStartRest={startRestTimer} onCancelRest={cancelRestTimer} />;
+  }
 
   // Show skeleton screen if data is loading and cache is completely empty
   const showSkeleton = dbLoading && (workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0 && !localStorage.getItem('ascend_profile'));

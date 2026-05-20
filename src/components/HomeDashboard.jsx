@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
-import { Flame, Droplets, Target, ChevronRight, Activity, Plus, Minus, Settings, RefreshCw, Dumbbell, Clock } from 'lucide-react';
+import { Flame, Droplets, ChevronRight, Activity, Plus, Minus, Settings, RefreshCw, Dumbbell, Clock } from 'lucide-react';
 import { useApp } from '../store/AppContext';
+
+const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function HomeDashboard({ onNavigate }) {
   const {
     todayTotals, goals, todayWater, addWater, todaySteps, addSteps,
     streak, todayWorkout, todayScheduleLabel, activePlan,
-    startWorkoutSession, units,
+    startWorkoutSession,
     selectedDate, setSelectedDate, dbLoading, workoutHistory, mealsByDate
   } = useApp();
 
@@ -17,15 +19,13 @@ export default function HomeDashboard({ onNavigate }) {
     return workoutHistory.find(w => w.date === selectedDate) || null;
   }, [workoutHistory, selectedDate]);
 
-  // Calculate Monday of the current week (local time)
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const todayDateObj = new Date();
-  const todayDay = todayDateObj.getDay();
-  const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
-  const mondayDate = new Date(todayDateObj);
-  mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
-
   const weekDays = useMemo(() => {
+    const todayDateObj = new Date();
+    const todayDay = todayDateObj.getDay();
+    const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
+    const mondayDate = new Date(todayDateObj);
+    mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
+
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(mondayDate);
       d.setDate(mondayDate.getDate() + i);
