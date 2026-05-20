@@ -804,7 +804,7 @@ export function AppProvider({ children, session }) {
       
       const { error: insertError } = await supabase
         .from('profiles')
-        .insert(newProfile);
+        .upsert(newProfile);
       
       if (insertError) throw insertError;
 
