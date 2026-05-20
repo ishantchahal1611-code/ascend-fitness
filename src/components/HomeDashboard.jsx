@@ -313,7 +313,7 @@ export default function HomeDashboard({ onNavigate }) {
         <div className="card flex-row justify-between" style={{ padding: 24 }}>
           {completedWorkout ? (
             <div className="flex-col flex-1">
-              <span className="text-caption text-green" style={{ marginBottom: 4 }}>Completed 🎉</span>
+              <span className="text-caption text-green" style={{ marginBottom: 4 }}>Completed</span>
               <h3 className="text-h3" style={{ marginBottom: 8 }}>{completedWorkout.planName}</h3>
               <div className="flex-row gap-md text-label" style={{ fontSize: 13 }}>
                 <span className="flex-row gap-sm" style={{ alignItems: 'center' }}><Clock size={13} /> {completedWorkout.duration}m</span>
@@ -326,7 +326,7 @@ export default function HomeDashboard({ onNavigate }) {
               <div className="flex-col">
                 <span className="text-caption text-orange" style={{ marginBottom: 4 }}>{activePlan?.shortName || 'PPL'} • {todayScheduleLabel}</span>
                 <h3 className="text-h3" style={{ marginBottom: 8 }}>
-                  {todayWorkout ? todayWorkout.name : 'Rest Day 😌'}
+                  {todayWorkout ? todayWorkout.name : 'Rest Day'}
                 </h3>
                 <span className="text-label">{todayWorkout ? `${todayWorkout.exercises.length} Exercises` : 'Recovery & Stretch'}</span>
               </div>
