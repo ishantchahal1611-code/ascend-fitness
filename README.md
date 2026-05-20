@@ -1,16 +1,64 @@
-# React + Vite
+# Ascend Fitness
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Ascend Fitness is a modern, high-performance, and visually stunning web application designed for comprehensive fitness, calorie, and activity tracking. Built with a sleek dark-themed interface, the application offers premium usability, smooth animations, and robust cloud data synchronization.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ✨ Features
 
-## React Compiler
+- **📊 Comprehensive Dashboard:** Real-time visual tracking of daily nutrition (calories, protein, carbs, fats), active duration, bodyweight milestones, and daily steps.
+- **🏋️ Workout Planner:** Log workouts, manage custom routines (Push/Pull/Legs templates or custom created routines), duplicate plans, track sets, and record Personal Records (PRs) seamlessly.
+- **🍎 Nutrition & Calorie Tracker:** Log custom meals, save favorite items to a persistent food list, track macro goals, and monitor total water intake.
+- **🏃 Live Activity Tracker:** Capture live running, walking, or cycling sessions with real-time pace, distance, and calorie expenditure metrics.
+- **☁️ Cloud Sync & Migration:** Powered by Supabase for user authentication and relational database storage. Includes automatic offline-to-online migration of local session data upon first registration.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Technology Stack
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Frontend Core:** React, Vite (Single Page Application)
+- **Styling:** Custom Vanilla CSS with custom theme variables (Dark Mode optimized)
+- **Icons:** Lucide React
+- **Backend / Authentication:** Supabase (PostgreSQL database & JWT-based user authentication)
+
+---
+
+## ⚙️ Getting Started
+
+### 1. Prerequisites
+Ensure you have [Node.js](https://nodejs.org) (v18 or higher) and `npm` installed.
+
+### 2. Installation
+Clone the repository and install all dependencies:
+```bash
+git clone https://github.com/ishantchahal1611-code/ascend-fitness.git
+cd ascend-fitness
+npm install
+```
+
+### 3. Database Setup (Supabase)
+1. Create a new project on the [Supabase Dashboard](https://supabase.com).
+2. Open the **SQL Editor** in your Supabase project.
+3. Copy and run the contents of [`supabase_schema.sql`](file:///c:/Antigravity%20workspace/supabase_schema.sql) to initialize the database tables, relations, and permissions.
+
+### 4. Environment Configuration
+Create a `.env` file in the root directory:
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 5. Running Locally
+Start the local development server:
+```bash
+npm run dev
+```
+
+---
+
+## 📂 Project Structure
+
+- `src/store/AppContext.jsx`: Central React context managing global application state and direct synchronization with the Supabase client.
+- `src/components/Auth.jsx`: Sleek authentication portal for signup, login, and secure session state.
+- `src/components/Settings.jsx`: Profile configurations, goal updates, daily step calibration, and secure sign out capabilities.
+- `supabase_schema.sql`: SQL initialization script outlining structure for workouts, profiles, custom plans, activities, and nutrition database.
