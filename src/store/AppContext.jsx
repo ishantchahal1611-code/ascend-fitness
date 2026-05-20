@@ -856,7 +856,7 @@ export function AppProvider({ children, session }) {
     activeSession, startWorkoutSession, toggleSetComplete, updateSetData, addSetToExercise, removeSetFromExercise,
     finishWorkout, cancelWorkout, restTimer, startRestTimer, cancelRestTimer,
     workoutHistory, personalRecords,
-    todayMeals, todayTotals, addMeal, removeMeal, editMeal, favoriteFoods, toggleFavorite,
+    todayMeals, todayTotals, addMeal, removeMeal, editMeal, favoriteFoods, toggleFavorite, mealsByDate,
     todayWater, addWater, waterByDate,
     bodyweightLog, currentWeight, addBodyweight,
     todaySteps, addSteps,
