@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../store/AppContext';
-import { User, Activity, ArrowRight, ArrowLeft, Target, Flame, Calendar, Award } from 'lucide-react';
+import { User, Activity, ArrowRight, ArrowLeft, Target, Flame, Award } from 'lucide-react';
 import '../index.css';
 
 export default function Onboarding() {
@@ -49,7 +49,7 @@ export default function Onboarding() {
     const goalWeightKg = isMetric ? gw : gw * 0.453592;
 
     // BMR
-    let bmr = 0;
+    let bmr;
     if (gender === 'Male') {
       bmr = 10 * weightKg + 6.25 * heightCm - 5 * a + 5;
     } else if (gender === 'Female') {
@@ -92,13 +92,9 @@ export default function Onboarding() {
     const isLoss = startW > goalW;
 
     for (let m = 0; m <= 6; m++) {
-      let wt = startW;
-      if (isLoss) {
-        wt = Math.max(goalW, startW - rate * m);
-      } else {
-        // Gain weight case (if current weight < goal weight)
-        wt = Math.min(goalW, startW + rate * m);
-      }
+      const wt = isLoss
+        ? Math.max(goalW, startW - rate * m)
+        : Math.min(goalW, startW + rate * m);
       points.push({ month: `M${m}`, weight: parseFloat(wt.toFixed(1)) });
     }
     return points;

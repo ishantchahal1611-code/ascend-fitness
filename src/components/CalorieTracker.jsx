@@ -1,8 +1,36 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Scan, Plus, ChevronRight, Apple, X, Search, Heart, Trash2, Edit3, Droplets, Minus, Star } from 'lucide-react';
+import { Plus, ChevronRight, Apple, X, Search, Heart, Trash2, Droplets, Minus } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { FOOD_DB } from '../data/presets';
+
+const addCustomFoodWithId = (onAdd, mealType, custom, onClose) => {
+  onAdd({
+    mealType,
+    foodId: 'custom-' + Date.now() + '-' + Math.round(Math.random() * 1000),
+    name: custom.name,
+    calories: parseInt(custom.calories),
+    protein: parseInt(custom.protein) || 0,
+    carbs: parseInt(custom.carbs) || 0,
+    fats: parseInt(custom.fats) || 0,
+    qty: 1
+  });
+  onClose();
+};
+
+const addFoodWithId = (onAdd, mealType, food, onClose) => {
+  onAdd({
+    mealType,
+    foodId: food.id || 'food-' + Date.now() + '-' + Math.round(Math.random() * 1000),
+    name: food.name,
+    calories: food.calories,
+    protein: food.protein,
+    carbs: food.carbs,
+    fats: food.fats,
+    qty: 1
+  });
+  onClose();
+};
 
 /* ── Add Meal Modal ── */
 function AddMealModal({ onAdd, onClose, favoriteFoods, onToggleFav }) {
@@ -13,20 +41,18 @@ function AddMealModal({ onAdd, onClose, favoriteFoods, onToggleFav }) {
   const [custom, setCustom] = useState({ name: '', calories: '', protein: '', carbs: '', fats: '' });
 
   const filtered = useMemo(() => {
-    let list = tab === 'favorites' ? favoriteFoods : FOOD_DB;
-    if (query) list = list.filter(f => f.name.toLowerCase().includes(query.toLowerCase()));
-    return list;
+    const list = tab === 'favorites' ? favoriteFoods : FOOD_DB;
+    if (!query) return list;
+    return list.filter(f => f.name.toLowerCase().includes(query.toLowerCase()));
   }, [query, tab, favoriteFoods]);
-
-  const handleAddFood = (food) => {
-    onAdd({ mealType, foodId: food.id, name: food.name, calories: food.calories, protein: food.protein, carbs: food.carbs, fats: food.fats, qty: 1 });
-    onClose();
-  };
 
   const handleAddCustom = () => {
     if (!custom.name || !custom.calories) return;
-    onAdd({ mealType, foodId: 'custom-' + Date.now(), name: custom.name, calories: parseInt(custom.calories), protein: parseInt(custom.protein) || 0, carbs: parseInt(custom.carbs) || 0, fats: parseInt(custom.fats) || 0, qty: 1 });
-    onClose();
+    addCustomFoodWithId(onAdd, mealType, custom, onClose);
+  };
+
+  const handleAddFood = (food) => {
+    addFoodWithId(onAdd, mealType, food, onClose);
   };
 
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
@@ -119,9 +145,8 @@ function AddMealModal({ onAdd, onClose, favoriteFoods, onToggleFav }) {
 
 /* ── Main CalorieTracker ── */
 export default function CalorieTracker() {
-  const { todayMeals, todayTotals, goals, addMeal, removeMeal, editMeal, todayWater, addWater, favoriteFoods, toggleFavorite } = useApp();
+  const { todayMeals, todayTotals, goals, addMeal, removeMeal, todayWater, addWater, favoriteFoods, toggleFavorite } = useApp();
   const [showAdd, setShowAdd] = useState(false);
-  const [editingMeal, setEditingMeal] = useState(null);
 
   const calPct = Math.min(100, (todayTotals.calories / goals.calories) * 100);
   const remaining = goals.calories - todayTotals.calories;

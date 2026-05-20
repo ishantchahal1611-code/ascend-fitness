@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { MapPin, Play, Timer, Footprints, Wind, Navigation, Pause, Square, X, Bike, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { MapPin, Play, Timer, Footprints, Wind, Square, X, Bike } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 
 /* ── Live Activity Session ── */

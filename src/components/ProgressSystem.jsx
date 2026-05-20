@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, TrendingUp, Medal, Star, Award, Scale, Plus, X } from 'lucide-react';
+import { Trophy, TrendingUp, Medal, Star, Award, Plus } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApp } from '../store/AppContext';
 import { getExercise } from '../data/presets';
@@ -34,7 +34,6 @@ function LogWeightModal({ currentWeight, unit, onSave, onClose }) {
 export default function ProgressSystem() {
   const { bodyweightLog, currentWeight, addBodyweight, units, workoutHistory, streak, personalRecords } = useApp();
   const [showWeightModal, setShowWeightModal] = useState(false);
-  const [chartRange, setChartRange] = useState('6m');
 
   const weightUnit = units.weight;
 
@@ -48,7 +47,6 @@ export default function ProgressSystem() {
   const startWeight = chartData[0]?.weight || 0;
   const latestWeight = chartData[chartData.length - 1]?.weight || 0;
   const weightChange = (latestWeight - startWeight).toFixed(1);
-  const isLoss = parseFloat(weightChange) < 0;
 
   // Workout stats
   const totalWorkouts = workoutHistory.length;

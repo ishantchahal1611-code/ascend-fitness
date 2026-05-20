@@ -4,7 +4,7 @@ import { Calendar, ChevronRight, Play, X, Dumbbell, History, Repeat, Trash2, Che
 import { useApp } from '../store/AppContext';
 import { getExercise, WORKOUT_TEMPLATES } from '../data/presets';
 
-const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /* ── Active Workout Session ── */
 function ActiveSession({ session, onToggleSet, onUpdateSet, onAddSet, onRemoveSet, onFinish, onCancel, restTimer, onStartRest }) {
@@ -235,14 +235,13 @@ export default function WorkoutPlanner() {
 
   const weekDays = useMemo(() => {
     const todayDateObj = new Date();
-    const todayDay = todayDateObj.getDay();
-    const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
-    const mondayDate = new Date(todayDateObj);
-    mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
+    const todayDay = todayDateObj.getDay(); // Sun=0 .. Sat=6
+    const sundayDate = new Date(todayDateObj);
+    sundayDate.setDate(todayDateObj.getDate() - todayDay);
 
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(mondayDate);
-      d.setDate(mondayDate.getDate() + i);
+      const d = new Date(sundayDate);
+      d.setDate(sundayDate.getDate() + i);
       
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -258,6 +257,7 @@ export default function WorkoutPlanner() {
         dateNum: d.getDate(),
         dateStr,
         active: dateStr === selectedDate,
+        isToday: dateStr === getToday(),
         workout: scheduleLabel,
         hasWorkout,
         hasMeals
@@ -324,22 +324,61 @@ export default function WorkoutPlanner() {
       {/* Weekly Schedule */}
       <section className="mb-section">
         <h2 className="text-h2" style={{ fontSize: 18, marginBottom: 16 }}>This Week</h2>
-        <div className="flex-row" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
-          {weekDays.map((item, i) => (
-            <button key={i} className={`card ${item.active ? 'card-elevated' : ''}`}
-              onClick={() => setSelectedDate(item.dateStr)}
-              style={{
-                minWidth: 64, padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-                border: item.active ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-                background: item.active ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
-                opacity: (!item.active && item.workout === 'Rest') ? 0.5 : 1,
-                cursor: 'pointer', outline: 'none'
-              }}>
-              <span className="text-caption" style={{ color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)', fontSize: 11 }}>{item.day}</span>
-              <span className="text-h2" style={{ margin: '6px 0', fontSize: 20, color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.dateNum}</span>
-              <span style={{ fontSize: 10, fontWeight: 500, color: item.active ? 'var(--accent-blue)' : 'var(--text-tertiary)' }}>{item.workout}</span>
-            </button>
-          ))}
+        <div className="flex-row justify-between" style={{ margin: '0 -8px', padding: '0 8px', overflowX: 'auto', gap: 6 }}>
+          {weekDays.map((item, i) => {
+            const circleStyle = item.active ? {
+              border: '2.5px solid var(--text-primary)',
+              background: 'var(--bg-surface-elevated)'
+            } : item.isToday ? {
+              border: '2px solid var(--text-secondary)',
+              background: 'var(--bg-surface)'
+            } : item.hasWorkout ? {
+              border: '2px solid var(--accent-red)',
+              background: 'var(--bg-surface)'
+            } : item.hasMeals ? {
+              border: '2px solid var(--accent-green)',
+              background: 'var(--bg-surface)'
+            } : {
+              border: '1.5px dashed var(--border-subtle)',
+              background: 'transparent',
+              opacity: 0.5
+            };
+            return (
+              <button key={i}
+                onClick={() => setSelectedDate(item.dateStr)}
+                style={{
+                  background: 'none', border: 'none', padding: 0, outline: 'none', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1, minWidth: 38
+                }}
+              >
+                <span className="text-caption" style={{ 
+                  fontSize: 11, 
+                  fontWeight: item.active ? '700' : '500',
+                  color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)'
+                }}>
+                  {item.day}
+                </span>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 700,
+                  color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  ...circleStyle
+                }}>
+                  {item.dateNum}
+                </div>
+                <span style={{ 
+                  fontSize: 9, 
+                  fontWeight: 600, 
+                  color: item.active ? 'var(--accent-blue)' : 'var(--text-tertiary)',
+                  marginTop: 2,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {item.workout}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 

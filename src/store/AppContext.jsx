@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { WORKOUT_TEMPLATES, getExercise } from '../data/presets';
 import { supabase } from '../supabaseClient';
@@ -5,7 +6,7 @@ import { supabase } from '../supabaseClient';
 const AppContext = createContext();
 const getToday = () => new Date().toISOString().split('T')[0];
 let _id = Date.now();
-export const uid = () => (_id++).toString(36);
+const uid = () => (_id++).toString(36);
 
 function load(key, def) {
   try { const v = localStorage.getItem(`ascend_${key}`); return v ? JSON.parse(v) : def; }

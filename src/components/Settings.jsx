@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, Moon, Sun, Monitor, User, Bell, Ruler, Target, Droplets, Footprints, Flame, ChevronRight, Scale } from 'lucide-react';
+import { Moon, Sun, Monitor, Bell, Ruler, Target, Droplets, Footprints, Flame, ChevronRight, Scale } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 import { supabase } from '../supabaseClient';
 
@@ -357,7 +357,7 @@ function RecalculateMacrosModal({ profile, currentWeight, weightUnit, goals, set
     const age = profile.age || 25;
     const gender = profile.gender || 'Other';
 
-    let bmr = 0;
+    let bmr;
     if (gender === 'Male') {
       bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
     } else if (gender === 'Female') {
