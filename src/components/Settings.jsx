@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, Moon, Sun, Monitor, User, Bell, Ruler, Target, Droplets, Footprints, Flame, ChevronRight, Scale } from 'lucide-react';
 import { useApp } from '../store/AppContext';
+import { supabase } from '../supabaseClient';
 
 function Toggle({ value, onChange }) {
   return (
@@ -117,7 +118,7 @@ function ProfileModal({ profile, currentWeight, weightUnit, onSaveProfile, onSav
   );
 }
 
-export default function Settings() {
+export default function Settings({ session }) {
   const { theme, setTheme, units, setUnits, goals, setGoals, profile, setProfile, notifications, setNotifications, currentWeight, addBodyweight } = useApp();
   const [editGoal, setEditGoal] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -248,6 +249,24 @@ export default function Settings() {
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           </SettingRow>
+        </div>
+      </section>
+
+      {/* Account */}
+      <section className="mb-section">
+        <span className="text-caption" style={{ marginBottom: 12, display: 'block' }}>Account</span>
+        <div className="card" style={{ padding: '20px' }}>
+          <div className="flex-col gap-sm" style={{ marginBottom: 16 }}>
+            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Logged in as</span>
+            <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{session?.user?.email}</span>
+          </div>
+          <button 
+            className="btn" 
+            style={{ width: '100%', backgroundColor: 'var(--accent-red, #ef4444)', color: '#ffffff', border: 'none', padding: '12px 16px', borderRadius: 'var(--radius-sm, 8px)', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign Out
+          </button>
         </div>
       </section>
 

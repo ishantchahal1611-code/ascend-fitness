@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './store/AppContext';
+import { supabase } from './supabaseClient';
+import Auth from './components/Auth';
 import HomeDashboard from './components/HomeDashboard';
 import WorkoutPlanner from './components/WorkoutPlanner';
 import CalorieTracker from './components/CalorieTracker';
@@ -8,7 +10,7 @@ import ProgressSystem from './components/ProgressSystem';
 import Settings from './components/Settings';
 import BottomNav from './components/BottomNav';
 
-function AppContent() {
+function AppContent({ session }) {
   const [activeTab, setActiveTab] = useState('home');
   const { restTimer, cancelRestTimer } = useApp();
 
@@ -19,7 +21,7 @@ function AppContent() {
       case 'calories': return <CalorieTracker />;
       case 'activity': return <ActivityTracker />;
       case 'progress': return <ProgressSystem />;
-      case 'settings': return <Settings />;
+      case 'settings': return <Settings session={session} />;
       default: return <HomeDashboard onNavigate={setActiveTab} />;
     }
   };
@@ -42,9 +44,35 @@ function AppContent() {
 }
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>Loading Ascend Fitness...</div>;
+  }
+
+  if (!session) {
+    return <Auth onLogin={setSession} />;
+  }
+
   return (
-    <AppProvider>
-      <AppContent />
+    <AppProvider session={session}>
+      <AppContent session={session} />
     </AppProvider>
   );
 }

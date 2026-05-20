@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { WORKOUT_TEMPLATES, DEFAULT_MEALS, DEFAULT_ACTIVITIES, DEFAULT_WORKOUT_HISTORY, DEFAULT_BODYWEIGHT, getExercise } from '../data/presets';
+import { WORKOUT_TEMPLATES, getExercise } from '../data/presets';
+import { supabase } from '../supabaseClient';
 
 const AppContext = createContext();
 const getToday = () => new Date().toISOString().split('T')[0];
@@ -12,18 +13,379 @@ function load(key, def) {
 }
 function save(key, val) { localStorage.setItem(`ascend_${key}`, JSON.stringify(val)); }
 
-export function AppProvider({ children }) {
+export function AppProvider({ children, session }) {
+  const [dbLoading, setDbLoading] = useState(true);
   const [theme, setTheme] = useState(() => load('theme', 'dark'));
   const [units, setUnits] = useState(() => load('units', { weight: 'kg', distance: 'km' }));
   const [goals, setGoals] = useState(() => load('goals', { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 }));
   const [profile, setProfile] = useState(() => load('profile', { name: 'User', age: 25, height: 175, gender: 'Other' }));
   const [notifications, setNotifications] = useState(() => load('notifications', { workout: true, meals: true, water: true, steps: true }));
 
-  useEffect(() => save('theme', theme), [theme]);
-  useEffect(() => save('units', units), [units]);
-  useEffect(() => save('goals', goals), [goals]);
-  useEffect(() => save('profile', profile), [profile]);
-  useEffect(() => save('notifications', notifications), [notifications]);
+  useEffect(() => {
+    if (!dbLoading) {
+      save('theme', theme);
+      if (session?.user?.id) {
+        supabase.from('profiles').upsert({ id: session.user.id, theme }).then(({ error }) => {
+          if (error) console.error('Error saving theme:', error);
+        });
+      }
+    }
+  }, [theme, dbLoading, session]);
+
+  useEffect(() => {
+    if (!dbLoading) {
+      save('units', units);
+      if (session?.user?.id) {
+        supabase.from('profiles').upsert({ id: session.user.id, units }).then(({ error }) => {
+          if (error) console.error('Error saving units:', error);
+        });
+      }
+    }
+  }, [units, dbLoading, session]);
+
+  useEffect(() => {
+    if (!dbLoading) {
+      save('goals', goals);
+      if (session?.user?.id) {
+        supabase.from('profiles').upsert({ id: session.user.id, goals }).then(({ error }) => {
+          if (error) console.error('Error saving goals:', error);
+        });
+      }
+    }
+  }, [goals, dbLoading, session]);
+
+  useEffect(() => {
+    if (!dbLoading) {
+      save('profile', profile);
+      if (session?.user?.id) {
+        supabase.from('profiles').upsert({
+          id: session.user.id,
+          name: profile.name,
+          age: profile.age,
+          height: profile.height,
+          gender: profile.gender
+        }).then(({ error }) => {
+          if (error) console.error('Error saving profile:', error);
+        });
+      }
+    }
+  }, [profile, dbLoading, session]);
+
+  useEffect(() => {
+    if (!dbLoading) {
+      save('notifications', notifications);
+      if (session?.user?.id) {
+        supabase.from('profiles').upsert({ id: session.user.id, notifications }).then(({ error }) => {
+          if (error) console.error('Error saving notifications:', error);
+        });
+      }
+    }
+  }, [notifications, dbLoading, session]);
+
+  useEffect(() => {
+    async function loadUserData() {
+      if (!session?.user?.id) {
+        setDbLoading(false);
+        return;
+      }
+      try {
+        setDbLoading(true);
+        // 1. Load Profile
+        let { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        if (!profileData) {
+          const newProfile = {
+            id: session.user.id,
+            name: profile.name,
+            age: profile.age,
+            height: profile.height,
+            gender: profile.gender,
+            theme,
+            units,
+            goals,
+            notifications
+          };
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert(newProfile);
+          if (insertError) throw insertError;
+
+          // Migrate local storage data to Supabase
+          const localCustomPlans = load('customPlans', []);
+          if (localCustomPlans.length > 0) {
+            for (const p of localCustomPlans) {
+              await supabase.from('custom_plans').insert({
+                id: p.id,
+                user_id: session.user.id,
+                name: p.name,
+                short_name: p.shortName,
+                schedule: p.schedule,
+                days: p.days
+              });
+            }
+          }
+
+          const localWorkoutHistory = load('workoutHistory', []);
+          if (localWorkoutHistory.length > 0) {
+            for (const h of localWorkoutHistory) {
+              await supabase.from('workout_history').insert({
+                id: h.id,
+                user_id: session.user.id,
+                plan_name: h.planName,
+                date: h.date,
+                duration: h.duration,
+                exercises: h.exercises,
+                total_volume: h.totalVolume
+              });
+            }
+          }
+
+          const localPRs = load('prs', {});
+          const prKeys = Object.keys(localPRs);
+          if (prKeys.length > 0) {
+            for (const key of prKeys) {
+              await supabase.from('personal_records').upsert({
+                user_id: session.user.id,
+                exercise_id: key,
+                weight: localPRs[key]
+              });
+            }
+          }
+
+          const localMeals = load('meals', {});
+          const mealDates = Object.keys(localMeals);
+          if (mealDates.length > 0) {
+            for (const d of mealDates) {
+              for (const m of (localMeals[d] || [])) {
+                await supabase.from('meals').insert({
+                  id: m.id,
+                  user_id: session.user.id,
+                  date: d,
+                  name: m.name,
+                  calories: m.calories,
+                  protein: m.protein,
+                  carbs: m.carbs,
+                  fats: m.fats,
+                  qty: m.qty || 1
+                });
+              }
+            }
+          }
+
+          const localFavFoods = load('favFoods', []);
+          if (localFavFoods.length > 0) {
+            for (const f of localFavFoods) {
+              await supabase.from('favorite_foods').insert({
+                id: f.id,
+                user_id: session.user.id,
+                name: f.name,
+                calories: f.calories,
+                protein: f.protein,
+                carbs: f.carbs,
+                fats: f.fats
+              });
+            }
+          }
+
+          const localWater = load('water', {});
+          const localSteps = load('steps', {});
+          const localWeight = load('bodyweight', []);
+          const allDates = new Set([
+            ...Object.keys(localWater),
+            ...Object.keys(localSteps),
+            ...localWeight.map(b => b.date)
+          ]);
+          if (allDates.size > 0) {
+            for (const d of allDates) {
+              const wt = localWeight.find(b => b.date === d)?.weight || null;
+              await supabase.from('daily_metrics').insert({
+                user_id: session.user.id,
+                date: d,
+                water: localWater[d] || 0,
+                steps: localSteps[d] || 0,
+                bodyweight: wt
+              });
+            }
+          }
+
+          const localActivities = load('activities', []);
+          if (localActivities.length > 0) {
+            for (const a of localActivities) {
+              await supabase.from('activities').insert({
+                id: a.id,
+                user_id: session.user.id,
+                type: a.type,
+                label: a.label,
+                date: a.date,
+                distance: a.distance,
+                duration: a.duration,
+                pace: a.pace,
+                calories: a.calories
+              });
+            }
+          }
+        } else {
+          setTheme(profileData.theme || 'dark');
+          setUnits(profileData.units || { weight: 'kg', distance: 'km' });
+          setGoals(profileData.goals || { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 });
+          setProfile({
+            name: profileData.name || 'User',
+            age: profileData.age || 25,
+            height: profileData.height || 175,
+            gender: profileData.gender || 'Other'
+          });
+          setNotifications(profileData.notifications || { workout: true, meals: true, water: true, steps: true });
+        }
+
+        // 2. Load Custom Plans
+        const { data: plansData, error: plansError } = await supabase
+          .from('custom_plans')
+          .select('*')
+          .eq('user_id', session.user.id);
+        if (plansError) throw plansError;
+        if (plansData) {
+          setCustomPlans(plansData.map(p => ({
+            id: p.id,
+            name: p.name,
+            shortName: p.short_name,
+            schedule: p.schedule,
+            days: p.days
+          })));
+        }
+
+        // 3. Load Workout History
+        const { data: historyData, error: historyError } = await supabase
+          .from('workout_history')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('date', { ascending: false });
+        if (historyError) throw historyError;
+        if (historyData) {
+          setWorkoutHistory(historyData.map(h => ({
+            id: h.id,
+            planName: h.plan_name,
+            date: h.date,
+            duration: h.duration,
+            exercises: h.exercises,
+            totalVolume: h.total_volume
+          })));
+        }
+
+        // 4. Load Personal Records
+        const { data: prsData, error: prsError } = await supabase
+          .from('personal_records')
+          .select('*')
+          .eq('user_id', session.user.id);
+        if (prsError) throw prsError;
+        if (prsData) {
+          const prsObj = prsData.reduce((acc, pr) => {
+            acc[pr.exercise_id] = pr.weight;
+            return acc;
+          }, {});
+          setPersonalRecords(prsObj);
+        }
+
+        // 5. Load Meals
+        const { data: mealsData, error: mealsError } = await supabase
+          .from('meals')
+          .select('*')
+          .eq('user_id', session.user.id);
+        if (mealsError) throw mealsError;
+        if (mealsData) {
+          const mealsByDateObj = mealsData.reduce((acc, m) => {
+            const d = m.date;
+            if (!acc[d]) acc[d] = [];
+            acc[d].push({
+              id: m.id,
+              name: m.name,
+              calories: m.calories,
+              protein: m.protein,
+              carbs: m.carbs,
+              fats: m.fats,
+              qty: m.qty
+            });
+            return acc;
+          }, {});
+          setMealsByDate(mealsByDateObj);
+        }
+
+        // 6. Load Favorite Foods
+        const { data: favsData, error: favsError } = await supabase
+          .from('favorite_foods')
+          .select('*')
+          .eq('user_id', session.user.id);
+        if (favsError) throw favsError;
+        if (favsData) {
+          setFavoriteFoods(favsData.map(f => ({
+            id: f.id,
+            name: f.name,
+            calories: f.calories,
+            protein: f.protein,
+            carbs: f.carbs,
+            fats: f.fats
+          })));
+        }
+
+        // 7. Load Daily Metrics (Water, Steps, Bodyweight)
+        const { data: metricsData, error: metricsError } = await supabase
+          .from('daily_metrics')
+          .select('*')
+          .eq('user_id', session.user.id);
+        if (metricsError) throw metricsError;
+        if (metricsData) {
+          const waterObj = {};
+          const stepsObj = {};
+          const weightLogArr = [];
+          metricsData.forEach(m => {
+            if (m.water !== null && m.water !== undefined) {
+              waterObj[m.date] = m.water;
+            }
+            if (m.steps !== null && m.steps !== undefined) {
+              stepsObj[m.date] = m.steps;
+            }
+            if (m.bodyweight !== null && m.bodyweight !== undefined) {
+              weightLogArr.push({ date: m.date, weight: m.bodyweight });
+            }
+          });
+          setWaterByDate(waterObj);
+          setStepsByDate(stepsObj);
+          weightLogArr.sort((a, b) => a.date.localeCompare(b.date));
+          setBodyweightLog(weightLogArr);
+        }
+
+        // 8. Load Activities
+        const { data: activitiesData, error: activitiesError } = await supabase
+          .from('activities')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('date', { ascending: false });
+        if (activitiesError) throw activitiesError;
+        if (activitiesData) {
+          setActivities(activitiesData.map(a => ({
+            id: a.id,
+            type: a.type,
+            label: a.label,
+            date: a.date,
+            distance: a.distance,
+            duration: a.duration,
+            pace: a.pace,
+            calories: a.calories
+          })));
+        }
+      } catch (err) {
+        console.error('Error loading Supabase user data:', err);
+      } finally {
+        setDbLoading(false);
+      }
+    }
+    loadUserData();
+  }, [session]);
 
   // Resolve theme
   const resolvedTheme = useMemo(() => {
@@ -41,23 +403,62 @@ export function AppProvider({ children }) {
   const [activePlanId, setActivePlanId] = useState(() => load('activePlanId', 'ppl'));
   const [customPlans, setCustomPlans] = useState(() => load('customPlans', []));
 
-  useEffect(() => save('activePlanId', activePlanId), [activePlanId]);
-  useEffect(() => save('customPlans', customPlans), [customPlans]);
+  useEffect(() => { if (!dbLoading) save('activePlanId', activePlanId); }, [activePlanId, dbLoading]);
+  useEffect(() => { if (!dbLoading) save('customPlans', customPlans); }, [customPlans, dbLoading]);
 
   const allPlans = useMemo(() => [...WORKOUT_TEMPLATES, ...customPlans], [customPlans]);
   const activePlan = useMemo(() => allPlans.find(p => p.id === activePlanId) || allPlans[0], [allPlans, activePlanId]);
 
   const setActivePlan = setActivePlanId;
-  const addCustomPlan = useCallback(plan => {
-    setCustomPlans(prev => [...prev, { ...plan, id: uid() }]);
-  }, []);
-  const editCustomPlan = useCallback((id, updates) => {
+  const addCustomPlan = useCallback(async plan => {
+    const newId = uid();
+    const newPlan = { ...plan, id: newId };
+    setCustomPlans(prev => [...prev, newPlan]);
+    if (session?.user?.id) {
+      await supabase.from('custom_plans').insert({
+        id: newId,
+        user_id: session.user.id,
+        name: plan.name,
+        short_name: plan.shortName,
+        schedule: plan.schedule,
+        days: plan.days
+      });
+    }
+  }, [session]);
+
+  const editCustomPlan = useCallback(async (id, updates) => {
     setCustomPlans(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-  }, []);
-  const deleteCustomPlan = useCallback(id => {
+    if (session?.user?.id) {
+      const { data } = await supabase.from('custom_plans').select('*').eq('id', id).single();
+      const current = data ? {
+        id: data.id,
+        name: data.name,
+        shortName: data.short_name,
+        schedule: data.schedule,
+        days: data.days
+      } : customPlans.find(p => p.id === id);
+      if (current) {
+        const merged = { ...current, ...updates };
+        await supabase.from('custom_plans').upsert({
+          id,
+          user_id: session.user.id,
+          name: merged.name,
+          short_name: merged.shortName,
+          schedule: merged.schedule,
+          days: merged.days
+        });
+      }
+    }
+  }, [session, customPlans]);
+
+  const deleteCustomPlan = useCallback(async id => {
     setCustomPlans(prev => prev.filter(p => p.id !== id));
     if (activePlanId === id) setActivePlanId('ppl');
-  }, [activePlanId]);
+    if (session?.user?.id) {
+      await supabase.from('custom_plans').delete().eq('id', id).eq('user_id', session.user.id);
+    }
+  }, [activePlanId, session]);
+
   const duplicatePlan = useCallback(id => {
     const src = allPlans.find(p => p.id === id);
     if (src) addCustomPlan({ ...src, name: src.name + ' (Copy)', shortName: src.shortName + '*' });
@@ -168,72 +569,150 @@ export function AppProvider({ children }) {
   }, [restTimer.active, restTimer.remaining]);
 
   // ── Workout History ──
-  const [workoutHistory, setWorkoutHistory] = useState(() => load('workoutHistory', DEFAULT_WORKOUT_HISTORY));
+  const [workoutHistory, setWorkoutHistory] = useState(() => load('workoutHistory', []));
   const [personalRecords, setPersonalRecords] = useState(() => load('prs', {}));
 
-  useEffect(() => save('workoutHistory', workoutHistory), [workoutHistory]);
-  useEffect(() => save('prs', personalRecords), [personalRecords]);
+  useEffect(() => { if (!dbLoading) save('workoutHistory', workoutHistory); }, [workoutHistory, dbLoading]);
+  useEffect(() => { if (!dbLoading) save('prs', personalRecords); }, [personalRecords, dbLoading]);
 
-  const finishWorkout = useCallback(() => {
+  const finishWorkout = useCallback(async () => {
     if (!activeSession) return;
     const dur = Math.round((Date.now() - activeSession.startTime) / 60000);
     let totalVol = 0;
     const newPRs = { ...personalRecords };
+    const prsToUpsert = [];
+    
     activeSession.exercises.forEach(ex => {
       ex.loggedSets.forEach(s => {
         if (s.completed) {
           totalVol += s.weight * s.reps;
           const key = ex.exerciseId;
-          if (!newPRs[key] || s.weight > newPRs[key]) newPRs[key] = s.weight;
+          if (!newPRs[key] || s.weight > newPRs[key]) {
+            newPRs[key] = s.weight;
+            prsToUpsert.push({
+              user_id: session?.user?.id,
+              exercise_id: key,
+              weight: s.weight
+            });
+          }
         }
       });
     });
-    const entry = { id: uid(), planName: activeSession.dayName, date: getToday(), duration: dur || 1, exercises: activeSession.exercises.length, totalVolume: totalVol };
+    const entryId = uid();
+    const today = getToday();
+    const entry = { id: entryId, planName: activeSession.dayName, date: today, duration: dur || 1, exercises: activeSession.exercises.length, totalVolume: totalVol };
     setWorkoutHistory(prev => [entry, ...prev]);
     setPersonalRecords(newPRs);
     setActiveSession(null);
     cancelRestTimer();
-  }, [activeSession, personalRecords, cancelRestTimer]);
+
+    if (session?.user?.id) {
+      await supabase.from('workout_history').insert({
+        id: entryId,
+        user_id: session.user.id,
+        plan_name: activeSession.dayName,
+        date: today,
+        duration: dur || 1,
+        exercises: activeSession.exercises.length,
+        total_volume: totalVol
+      });
+      
+      for (const pr of prsToUpsert) {
+        await supabase.from('personal_records').upsert(pr);
+      }
+    }
+  }, [activeSession, personalRecords, cancelRestTimer, session]);
 
   const cancelWorkout = useCallback(() => { setActiveSession(null); cancelRestTimer(); }, [cancelRestTimer]);
 
   // ── Meals / Nutrition ──
-  const [mealsByDate, setMealsByDate] = useState(() => load('meals', { [getToday()]: DEFAULT_MEALS }));
+  const [mealsByDate, setMealsByDate] = useState(() => load('meals', {}));
   const [favoriteFoods, setFavoriteFoods] = useState(() => load('favFoods', []));
 
-  useEffect(() => save('meals', mealsByDate), [mealsByDate]);
-  useEffect(() => save('favFoods', favoriteFoods), [favoriteFoods]);
+  useEffect(() => { if (!dbLoading) save('meals', mealsByDate); }, [mealsByDate, dbLoading]);
+  useEffect(() => { if (!dbLoading) save('favFoods', favoriteFoods); }, [favoriteFoods, dbLoading]);
 
   const todayMeals = mealsByDate[getToday()] || [];
 
-  const addMeal = useCallback((meal) => {
+  const addMeal = useCallback(async (meal) => {
     const today = getToday();
+    const newId = uid();
+    const newMeal = { ...meal, id: newId };
     setMealsByDate(prev => {
       const dayMeals = prev[today] || [];
-      return { ...prev, [today]: [...dayMeals, { ...meal, id: uid() }] };
+      return { ...prev, [today]: [...dayMeals, newMeal] };
     });
-  }, []);
+    if (session?.user?.id) {
+      await supabase.from('meals').insert({
+        id: newId,
+        user_id: session.user.id,
+        date: today,
+        name: meal.name,
+        calories: meal.calories,
+        protein: meal.protein,
+        carbs: meal.carbs,
+        fats: meal.fats,
+        qty: meal.qty || 1
+      });
+    }
+  }, [session]);
 
-  const removeMeal = useCallback((mealId) => {
+  const removeMeal = useCallback(async (mealId) => {
     const today = getToday();
     setMealsByDate(prev => {
       return { ...prev, [today]: (prev[today] || []).filter(m => m.id !== mealId) };
     });
-  }, []);
+    if (session?.user?.id) {
+      await supabase.from('meals').delete().eq('id', mealId).eq('user_id', session.user.id);
+    }
+  }, [session]);
 
-  const editMeal = useCallback((mealId, updates) => {
+  const editMeal = useCallback(async (mealId, updates) => {
     const today = getToday();
     setMealsByDate(prev => {
       return { ...prev, [today]: (prev[today] || []).map(m => m.id === mealId ? { ...m, ...updates } : m) };
     });
-  }, []);
+    if (session?.user?.id) {
+      const dayMeals = mealsByDate[today] || [];
+      const meal = dayMeals.find(m => m.id === mealId);
+      if (meal) {
+        const merged = { ...meal, ...updates };
+        await supabase.from('meals').upsert({
+          id: mealId,
+          user_id: session.user.id,
+          date: today,
+          name: merged.name,
+          calories: merged.calories,
+          protein: merged.protein,
+          carbs: merged.carbs,
+          fats: merged.fats,
+          qty: merged.qty || 1
+        });
+      }
+    }
+  }, [session, mealsByDate]);
 
-  const toggleFavorite = useCallback((food) => {
+  const toggleFavorite = useCallback(async (food) => {
+    const exists = favoriteFoods.find(f => f.id === food.id);
     setFavoriteFoods(prev => {
-      const exists = prev.find(f => f.id === food.id);
       return exists ? prev.filter(f => f.id !== food.id) : [...prev, food];
     });
-  }, []);
+    if (session?.user?.id) {
+      if (exists) {
+        await supabase.from('favorite_foods').delete().eq('id', food.id).eq('user_id', session.user.id);
+      } else {
+        await supabase.from('favorite_foods').insert({
+          id: food.id,
+          user_id: session.user.id,
+          name: food.name,
+          calories: food.calories,
+          protein: food.protein,
+          carbs: food.carbs,
+          fats: food.fats
+        });
+      }
+    }
+  }, [session, favoriteFoods]);
 
   const todayTotals = useMemo(() => {
     return todayMeals.reduce((acc, m) => ({
@@ -245,57 +724,82 @@ export function AppProvider({ children }) {
   }, [todayMeals]);
 
   // ── Water ──
-  const [waterByDate, setWaterByDate] = useState(() => load('water', { [getToday()]: 1.5 }));
+  const [waterByDate, setWaterByDate] = useState(() => load('water', {}));
   const todayWater = waterByDate[getToday()] || 0;
   
-  useEffect(() => save('water', waterByDate), [waterByDate]);
+  useEffect(() => { if (!dbLoading) save('water', waterByDate); }, [waterByDate, dbLoading]);
 
-  const addWater = useCallback((amount) => {
+  const upsertDailyMetric = useCallback(async (date, updates) => {
+    if (!session?.user?.id) return;
+    const { data } = await supabase.from('daily_metrics')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('date', date)
+      .maybeSingle();
+      
+    const merged = {
+      user_id: session.user.id,
+      date,
+      water: updates.water !== undefined ? updates.water : (data?.water || 0),
+      steps: updates.steps !== undefined ? updates.steps : (data?.steps || 0),
+      bodyweight: updates.bodyweight !== undefined ? updates.bodyweight : (data?.bodyweight || null)
+    };
+    await supabase.from('daily_metrics').upsert(merged);
+  }, [session]);
+
+  const addWater = useCallback(async (amount) => {
     const today = getToday();
-    setWaterByDate(prev => {
-      return { ...prev, [today]: Math.max(0, (prev[today] || 0) + amount) };
-    });
-  }, []);
+    const newWater = Math.max(0, (waterByDate[today] || 0) + amount);
+    setWaterByDate(prev => ({ ...prev, [today]: newWater }));
+    if (session?.user?.id) {
+      await upsertDailyMetric(today, { water: newWater });
+    }
+  }, [session, waterByDate, upsertDailyMetric]);
 
   // ── Bodyweight ──
-  const [bodyweightLog, setBodyweightLog] = useState(() => load('bodyweight', DEFAULT_BODYWEIGHT));
+  const [bodyweightLog, setBodyweightLog] = useState(() => load('bodyweight', []));
   const currentWeight = bodyweightLog[bodyweightLog.length - 1]?.weight || 78;
 
-  useEffect(() => save('bodyweight', bodyweightLog), [bodyweightLog]);
+  useEffect(() => { if (!dbLoading) save('bodyweight', bodyweightLog); }, [bodyweightLog, dbLoading]);
 
-  const addBodyweight = useCallback((weight) => {
+  const addBodyweight = useCallback(async (weight) => {
+    const today = getToday();
     setBodyweightLog(prev => {
-      const today = getToday();
       const filtered = prev.filter(e => e.date !== today);
       return [...filtered, { date: today, weight }];
     });
-  }, []);
+    if (session?.user?.id) {
+      await upsertDailyMetric(today, { bodyweight: weight });
+    }
+  }, [session, upsertDailyMetric]);
 
   // ── Steps ──
-  const [stepsByDate, setStepsByDate] = useState(() => load('steps', { [getToday()]: 6432 }));
+  const [stepsByDate, setStepsByDate] = useState(() => load('steps', {}));
   const todaySteps = stepsByDate[getToday()] || 0;
 
-  useEffect(() => save('steps', stepsByDate), [stepsByDate]);
+  useEffect(() => { if (!dbLoading) save('steps', stepsByDate); }, [stepsByDate, dbLoading]);
 
-  const addSteps = useCallback((count) => {
+  const addSteps = useCallback(async (count) => {
     const today = getToday();
-    setStepsByDate(prev => {
-      return { ...prev, [today]: (prev[today] || 0) + count };
-    });
-  }, []);
+    const newSteps = (stepsByDate[today] || 0) + count;
+    setStepsByDate(prev => ({ ...prev, [today]: newSteps }));
+    if (session?.user?.id) {
+      await upsertDailyMetric(today, { steps: newSteps });
+    }
+  }, [session, stepsByDate, upsertDailyMetric]);
 
   // ── Activities ──
-  const [activities, setActivities] = useState(() => load('activities', DEFAULT_ACTIVITIES));
+  const [activities, setActivities] = useState(() => load('activities', []));
   const [liveActivity, setLiveActivity] = useState(() => load('liveActivity', null));
 
-  useEffect(() => save('activities', activities), [activities]);
-  useEffect(() => save('liveActivity', liveActivity), [liveActivity]);
+  useEffect(() => { if (!dbLoading) save('activities', activities); }, [activities, dbLoading]);
+  useEffect(() => { if (!dbLoading) save('liveActivity', liveActivity); }, [liveActivity, dbLoading]);
 
   const startLiveActivity = useCallback((type) => {
     setLiveActivity({ type, label: type === 'run' ? 'Running' : type === 'walk' ? 'Walking' : 'Cycling', startTime: Date.now(), distance: 0, elapsed: 0 });
   }, []);
 
-  const stopLiveActivity = useCallback(() => {
+  const stopLiveActivity = useCallback(async () => {
     if (!liveActivity) return;
     const dur = Math.round((Date.now() - liveActivity.startTime) / 1000);
     const speed = liveActivity.type === 'run' ? 340 : liveActivity.type === 'walk' ? 620 : 180;
@@ -303,14 +807,30 @@ export function AppProvider({ children }) {
     const paceMin = Math.floor(dur / 60 / (dist || 1));
     const paceSec = Math.round((dur / (dist || 1)) % 60);
     const cal = Math.round(dist * (liveActivity.type === 'run' ? 80 : liveActivity.type === 'walk' ? 55 : 45));
+    const newId = uid();
+    const today = getToday();
     const entry = {
-      id: uid(), type: liveActivity.type, label: liveActivity.label,
-      date: getToday(), distance: parseFloat(dist.toFixed(1)),
+      id: newId, type: liveActivity.type, label: liveActivity.label,
+      date: today, distance: parseFloat(dist.toFixed(1)),
       duration: dur, pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`, calories: cal,
     };
     setActivities(prev => [entry, ...prev]);
     setLiveActivity(null);
-  }, [liveActivity]);
+
+    if (session?.user?.id) {
+      await supabase.from('activities').insert({
+        id: newId,
+        user_id: session.user.id,
+        type: liveActivity.type,
+        label: liveActivity.label,
+        date: today,
+        distance: parseFloat(dist.toFixed(1)),
+        duration: dur,
+        pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`,
+        calories: cal
+      });
+    }
+  }, [liveActivity, session]);
 
   const cancelLiveActivity = useCallback(() => { setLiveActivity(null); }, []);
 
@@ -358,6 +878,37 @@ export function AppProvider({ children }) {
     activities, liveActivity, startLiveActivity, stopLiveActivity, cancelLiveActivity, weekActivityStats,
     streak,
   };
+
+  if (dbLoading) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-primary, #09090b)',
+        color: 'var(--text-primary, #ffffff)',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid rgba(255,255,255,0.1)',
+          borderTopColor: 'var(--accent-color, #10b981)',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          marginBottom: '16px'
+        }} />
+        <span style={{ fontSize: '15px', fontWeight: 500, opacity: 0.8 }}>Syncing with cloud database...</span>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
