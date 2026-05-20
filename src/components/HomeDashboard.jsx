@@ -1,4 +1,5 @@
-import { Flame, Droplets, Target, ChevronRight, Activity, Plus, Minus, Settings } from 'lucide-react';
+import { useMemo } from 'react';
+import { Flame, Droplets, Target, ChevronRight, Activity, Plus, Minus, Settings, RefreshCw, Dumbbell, Clock } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 
 export default function HomeDashboard({ onNavigate }) {
@@ -6,28 +7,115 @@ export default function HomeDashboard({ onNavigate }) {
     todayTotals, goals, todayWater, addWater, todaySteps, addSteps,
     streak, todayWorkout, todayScheduleLabel, activePlan,
     startWorkoutSession, units,
+    selectedDate, setSelectedDate, dbLoading, workoutHistory, mealsByDate
   } = useApp();
 
-  const calPct = Math.min(100, Math.round((todayTotals.calories / goals.calories) * 100));
-  const proteinPct = Math.min(100, Math.round((todayTotals.protein / goals.protein) * 100));
-  const carbsPct = Math.min(100, Math.round((todayTotals.carbs / goals.carbs) * 100));
-  const waterPct = Math.min(100, Math.round((todayWater / goals.water) * 100));
-  const stepPct = Math.min(100, Math.round((todaySteps / goals.steps) * 100));
+  const getToday = () => new Date().toISOString().split('T')[0];
+
+  // Check if a workout has been completed on the selectedDate
+  const completedWorkout = useMemo(() => {
+    return workoutHistory.find(w => w.date === selectedDate) || null;
+  }, [workoutHistory, selectedDate]);
+
+  // Calculate Monday of the current week (local time)
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const todayDateObj = new Date();
+  const todayDay = todayDateObj.getDay();
+  const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
+  const mondayDate = new Date(todayDateObj);
+  mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mondayDate);
+      d.setDate(mondayDate.getDate() + i);
+      
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dateNumStr = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dateNumStr}`;
+      
+      const hasWorkout = workoutHistory.some(w => w.date === dateStr);
+      const hasMeals = (mealsByDate[dateStr] && mealsByDate[dateStr].length > 0);
+      
+      return {
+        day: dayLabels[i],
+        dateNum: d.getDate(),
+        dateStr,
+        active: dateStr === selectedDate,
+        hasWorkout,
+        hasMeals
+      };
+    });
+  }, [selectedDate, workoutHistory, mealsByDate]);
+
+  const selectedDateObj = useMemo(() => {
+    const parts = selectedDate.split('-');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+    return new Date();
+  }, [selectedDate]);
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const now = new Date();
-  const dateStr = `${dayNames[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;
+  const dateStr = `${dayNames[selectedDateObj.getDay()]}, ${selectedDateObj.getDate()} ${months[selectedDateObj.getMonth()]}`;
 
-  const weekDots = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const todayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const calPct = Math.min(100, Math.round((todayTotals.calories / goals.calories) * 100)) || 0;
+  const proteinPct = Math.min(100, Math.round((todayTotals.protein / goals.protein) * 100)) || 0;
+  const carbsPct = Math.min(100, Math.round((todayTotals.carbs / goals.carbs) * 100)) || 0;
+  const waterPct = Math.min(100, Math.round((todayWater / goals.water) * 100)) || 0;
+  const stepPct = Math.min(100, Math.round((todaySteps / goals.steps) * 100)) || 0;
+
+  const streakDots = weekDays.map((item) => ({
+    day: item.day[0],
+    completed: item.hasWorkout
+  }));
+
+  // Show skeleton screen if data is loading and cache is completely empty
+  const showSkeleton = dbLoading && (workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0 && !localStorage.getItem('ascend_profile'));
+
+  if (showSkeleton) {
+    return (
+      <div className="p-screen fade-in">
+        {/* Header Skeleton */}
+        <header className="flex-row justify-between mb-section" style={{ marginTop: 20 }}>
+          <div className="flex-col" style={{ width: '60%' }}>
+            <div className="skeleton-text" style={{ width: '40%', height: 16, marginBottom: 8 }} />
+            <div className="skeleton-title" style={{ width: '70%', height: 32 }} />
+          </div>
+          <div className="skeleton-circle" style={{ width: 48, height: 48 }} />
+        </header>
+
+        {/* Week Strip Skeleton */}
+        <div className="flex-row mb-section" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="skeleton" style={{ minWidth: 54, height: 68 }} />
+          ))}
+        </div>
+
+        {/* Rings Chart Card Skeleton */}
+        <div className="skeleton" style={{ width: '100%', height: 180, marginBottom: 32 }} />
+
+        {/* Workout Card Skeleton */}
+        <div className="skeleton" style={{ width: '100%', height: 140, marginBottom: 32 }} />
+
+        {/* Activity Card Skeleton */}
+        <div className="skeleton" style={{ width: '100%', height: 100, marginBottom: 16 }} />
+        <div className="skeleton" style={{ width: '100%', height: 100, marginBottom: 32 }} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-screen fade-in">
       {/* Header */}
       <header className="flex-row justify-between mb-section" style={{ marginTop: 20 }}>
         <div className="flex-col">
-          <span className="text-body" style={{ fontSize: 18 }}>{dateStr}</span>
+          <span className="text-body" style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {dateStr}
+            {dbLoading && <RefreshCw size={14} className="text-tertiary animate-spin" />}
+          </span>
           <h1 className="text-h1">Summary</h1>
         </div>
         <button className="avatar" onClick={() => onNavigate('settings')} style={{ cursor: 'pointer', border: 'none' }}>
@@ -35,66 +123,140 @@ export default function HomeDashboard({ onNavigate }) {
         </button>
       </header>
 
-      {/* Core Stats */}
-      <section className="mb-section flex-row gap-md">
-        {/* Calories */}
-        <div className="card flex-1 flex-col justify-between" style={{ minHeight: 160, position: 'relative', overflow: 'hidden', cursor: 'pointer' }} onClick={() => onNavigate('calories')}>
-          <div className="flex-row justify-between align-start" style={{ zIndex: 2 }}>
-            <div className="flex-col">
-              <span className="text-caption text-green">Calories</span>
-              <span className="text-h2" style={{ marginTop: 4 }}>{todayTotals.calories.toLocaleString()}</span>
-            </div>
-            <div className="btn-icon" style={{ backgroundColor: 'var(--accent-green-dim)', color: 'var(--accent-green)', width: 36, height: 36 }}>
-              <Flame size={18} />
-            </div>
-          </div>
-          <div style={{ zIndex: 2 }}>
-            <span className="text-label">Goal: {goals.calories.toLocaleString()} kcal</span>
-            <div style={{ height: 6, background: 'var(--bg-surface-elevated)', borderRadius: 3, marginTop: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${calPct}%`, background: 'var(--accent-green)', borderRadius: 3, transition: 'width 0.5s ease' }} />
-            </div>
-          </div>
-          <div style={{ position: 'absolute', right: -20, bottom: -20, width: 100, height: 100, background: 'var(--accent-green)', opacity: 0.1, borderRadius: '50%', filter: 'blur(30px)' }} />
-        </div>
-
-        {/* Macros Mini */}
-        <div className="flex-col gap-sm flex-1">
-          <div className="card" style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <span className="text-caption" style={{ color: 'var(--accent-blue)' }}>Protein</span>
-            <div className="flex-row justify-between" style={{ marginTop: 4 }}>
-              <span className="text-h3">{todayTotals.protein}g</span>
-              <span className="text-label" style={{ opacity: 0.5 }}>/ {goals.protein}g</span>
-            </div>
-          </div>
-          <div className="card" style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <span className="text-caption" style={{ color: 'var(--accent-orange)' }}>Carbs</span>
-            <div className="flex-row justify-between" style={{ marginTop: 4 }}>
-              <span className="text-h3">{todayTotals.carbs}g</span>
-              <span className="text-label" style={{ opacity: 0.5 }}>/ {goals.carbs}g</span>
-            </div>
-          </div>
+      {/* Week Dates Selector */}
+      <section className="mb-section" style={{ marginTop: -12 }}>
+        <div className="flex-row" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
+          {weekDays.map((item, i) => (
+            <button key={i} className={`card ${item.active ? 'card-elevated' : ''}`}
+              onClick={() => setSelectedDate(item.dateStr)}
+              style={{
+                minWidth: 54, padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                border: item.active ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                background: item.active ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
+                cursor: 'pointer', outline: 'none', position: 'relative'
+              }}>
+              <span className="text-caption" style={{ color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)', fontSize: 10 }}>{item.day}</span>
+              <span className="text-h2" style={{ margin: '4px 0', fontSize: 18, color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.dateNum}</span>
+              
+              {/* Activity indicators */}
+              <div className="flex-row gap-xs" style={{ gap: 3, marginTop: 2 }}>
+                {item.hasWorkout && <div style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: 'var(--accent-red)' }} />}
+                {item.hasMeals && <div style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: 'var(--accent-green)' }} />}
+              </div>
+            </button>
+          ))}
         </div>
       </section>
 
-      {/* Today's Workout */}
+      {/* Core Stats Overview Card (with Concentric Rings Chart) */}
+      <section className="mb-section" onClick={() => onNavigate('calories')} style={{ cursor: 'pointer' }}>
+        <div className="card flex-row gap-lg" style={{ padding: '24px 20px', minHeight: 180, position: 'relative', overflow: 'hidden' }}>
+          
+          {/* Rings Chart */}
+          <div style={{ position: 'relative', width: 130, height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="130" height="130" viewBox="0 0 160 160">
+              {/* Outer Ring: Calories */}
+              <circle cx="80" cy="80" r="68" fill="none" stroke="var(--accent-green-dim)" strokeWidth="9" />
+              <circle cx="80" cy="80" r="68" fill="none" stroke="var(--accent-green)" strokeWidth="9"
+                strokeDasharray="427.26" strokeDashoffset={427.26 - (calPct / 100) * 427.26}
+                strokeLinecap="round" transform="rotate(-90 80 80)"
+                style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+
+              {/* Middle Ring: Protein */}
+              <circle cx="80" cy="80" r="54" fill="none" stroke="var(--accent-blue-dim)" strokeWidth="9" />
+              <circle cx="80" cy="80" r="54" fill="none" stroke="var(--accent-blue)" strokeWidth="9"
+                strokeDasharray="339.29" strokeDashoffset={339.29 - (proteinPct / 100) * 339.29}
+                strokeLinecap="round" transform="rotate(-90 80 80)"
+                style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+
+              {/* Inner Ring: Carbs */}
+              <circle cx="80" cy="80" r="40" fill="none" stroke="var(--accent-orange-dim)" strokeWidth="9" />
+              <circle cx="80" cy="80" r="40" fill="none" stroke="var(--accent-orange)" strokeWidth="9"
+                strokeDasharray="251.33" strokeDashoffset={251.33 - (carbsPct / 100) * 251.33}
+                strokeLinecap="round" transform="rotate(-90 80 80)"
+                style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+            </svg>
+            <div className="flex-col align-center" style={{ position: 'absolute', zIndex: 2 }}>
+              <Flame size={20} className="text-green" />
+              <span style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{calPct}%</span>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="flex-col justify-between flex-1" style={{ gap: 10 }}>
+            <div className="flex-row justify-between align-center">
+              <h3 className="text-h3" style={{ fontSize: 16 }}>Nutrition</h3>
+              <ChevronRight size={18} className="text-tertiary" />
+            </div>
+            
+            <div className="flex-col gap-sm">
+              <div className="flex-row justify-between">
+                <span className="flex-row align-center gap-sm text-label" style={{ fontSize: 13 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--accent-green)' }} />
+                  Calories
+                </span>
+                <span className="text-label" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {todayTotals.calories.toLocaleString()} / {goals.calories.toLocaleString()} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)' }}>kcal</span>
+                </span>
+              </div>
+              <div className="flex-row justify-between">
+                <span className="flex-row align-center gap-sm text-label" style={{ fontSize: 13 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--accent-blue)' }} />
+                  Protein
+                </span>
+                <span className="text-label" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {todayTotals.protein} / {goals.protein} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)' }}>g</span>
+                </span>
+              </div>
+              <div className="flex-row justify-between">
+                <span className="flex-row align-center gap-sm text-label" style={{ fontSize: 13 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--accent-orange)' }} />
+                  Carbs
+                </span>
+                <span className="text-label" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {todayTotals.carbs} / {goals.carbs} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)' }}>g</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ position: 'absolute', right: -20, bottom: -20, width: 100, height: 100, background: 'var(--accent-green)', opacity: 0.03, borderRadius: '50%', filter: 'blur(30px)' }} />
+        </div>
+      </section>
+
+      {/* Today's / Selected Date's Workout */}
       <section className="mb-section">
         <div className="flex-row justify-between" style={{ marginBottom: 16 }}>
-          <h2 className="text-h2">Today's Workout</h2>
+          <h2 className="text-h2">{selectedDate === getToday() ? "Today's Workout" : "Scheduled Workout"}</h2>
           <span className="text-body" style={{ color: 'var(--accent-blue)', fontWeight: 500, cursor: 'pointer' }} onClick={() => onNavigate('workout')}>See Plan</span>
         </div>
         <div className="card flex-row justify-between" style={{ padding: 24 }}>
-          <div className="flex-col">
-            <span className="text-caption text-orange" style={{ marginBottom: 4 }}>{activePlan?.shortName || 'PPL'} • {todayScheduleLabel}</span>
-            <h3 className="text-h3" style={{ marginBottom: 8 }}>
-              {todayWorkout ? todayWorkout.name : 'Rest Day 😌'}
-            </h3>
-            <span className="text-label">{todayWorkout ? `${todayWorkout.exercises.length} Exercises` : 'Recovery & Stretch'}</span>
-          </div>
-          {todayWorkout && (
-            <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: 14 }}
-              onClick={() => { startWorkoutSession(todayWorkout); onNavigate('workout'); }}>
-              Start
-            </button>
+          {completedWorkout ? (
+            <div className="flex-col flex-1">
+              <span className="text-caption text-green" style={{ marginBottom: 4 }}>Completed 🎉</span>
+              <h3 className="text-h3" style={{ marginBottom: 8 }}>{completedWorkout.planName}</h3>
+              <div className="flex-row gap-md text-label" style={{ fontSize: 13 }}>
+                <span className="flex-row gap-sm" style={{ alignItems: 'center' }}><Clock size={13} /> {completedWorkout.duration}m</span>
+                <span className="flex-row gap-sm" style={{ alignItems: 'center' }}><Dumbbell size={13} /> {completedWorkout.exercises} exercises</span>
+                <span>{(completedWorkout.totalVolume / 1000).toFixed(1)}k kg volume</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex-col">
+                <span className="text-caption text-orange" style={{ marginBottom: 4 }}>{activePlan?.shortName || 'PPL'} • {todayScheduleLabel}</span>
+                <h3 className="text-h3" style={{ marginBottom: 8 }}>
+                  {todayWorkout ? todayWorkout.name : 'Rest Day 😌'}
+                </h3>
+                <span className="text-label">{todayWorkout ? `${todayWorkout.exercises.length} Exercises` : 'Recovery & Stretch'}</span>
+              </div>
+              {todayWorkout && (
+                <button className="btn btn-primary" style={{ padding: '12px 24px', fontSize: 14 }}
+                  onClick={() => { startWorkoutSession(todayWorkout); onNavigate('workout'); }}>
+                  Start
+                </button>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -156,15 +318,15 @@ export default function HomeDashboard({ onNavigate }) {
             </div>
           </div>
           <div className="flex-row gap-sm">
-            {weekDots.map((day, i) => (
+            {streakDots.map((dot, i) => (
               <div key={i} style={{
                 width: 32, height: 32, borderRadius: '50%',
-                backgroundColor: i <= todayIdx ? 'var(--accent-red-dim)' : 'var(--bg-surface-elevated)',
+                backgroundColor: dot.completed ? 'var(--accent-red-dim)' : 'var(--bg-surface-elevated)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: i <= todayIdx ? 'var(--accent-red)' : 'var(--text-tertiary)',
+                color: dot.completed ? 'var(--accent-red)' : 'var(--text-tertiary)',
                 fontSize: 12, fontWeight: 600
               }}>
-                {day}
+                {dot.day}
               </div>
             ))}
           </div>

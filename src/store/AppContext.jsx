@@ -272,6 +272,9 @@ export function AppProvider({ children, session }) {
     document.documentElement.setAttribute('data-theme', resolvedTheme);
   }, [resolvedTheme]);
 
+  // ── Selected Date ──
+  const [selectedDate, setSelectedDate] = useState(() => getToday());
+
   // ── Active Workout Plan ──
   const [activePlanId, setActivePlanId] = useState(() => load('activePlanId', 'ppl'));
   const [customPlans, setCustomPlans] = useState(() => load('customPlans', []));
@@ -339,10 +342,16 @@ export function AppProvider({ children, session }) {
 
   // ── Today's workout day ──
   const todayDayIndex = useMemo(() => {
+    const parts = selectedDate.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      const day = d.getDay();
+      return day === 0 ? 6 : day - 1; // Mon=0 .. Sun=6
+    }
     const d = new Date().getDay();
-    return d === 0 ? 6 : d - 1; // Mon=0 .. Sun=6
-  }, []);
-  const todayScheduleLabel = activePlan?.schedule?.[todayDayIndex] || 'Rest';
+    return d === 0 ? 6 : d - 1;
+  }, [selectedDate]);
+  const todayScheduleLabel = useMemo(() => activePlan?.schedule?.[todayDayIndex] || 'Rest', [activePlan, todayDayIndex]);
   const todayWorkout = useMemo(() => {
     if (!activePlan || todayScheduleLabel === 'Rest') return null;
     return activePlan.days.find(d => d.shortName === todayScheduleLabel) || null;
@@ -472,7 +481,7 @@ export function AppProvider({ children, session }) {
       });
     });
     const entryId = uid();
-    const today = getToday();
+    const today = selectedDate;
     const entry = { id: entryId, planName: activeSession.dayName, date: today, duration: dur || 1, exercises: activeSession.exercises.length, totalVolume: totalVol };
     setWorkoutHistory(prev => [entry, ...prev]);
     setPersonalRecords(newPRs);
@@ -494,7 +503,7 @@ export function AppProvider({ children, session }) {
         await supabase.from('personal_records').upsert(pr);
       }
     }
-  }, [activeSession, personalRecords, cancelRestTimer, session]);
+  }, [activeSession, personalRecords, cancelRestTimer, session, selectedDate]);
 
   const cancelWorkout = useCallback(() => { setActiveSession(null); cancelRestTimer(); }, [cancelRestTimer]);
 
@@ -505,10 +514,10 @@ export function AppProvider({ children, session }) {
   useEffect(() => { if (!dbLoading) save('meals', mealsByDate); }, [mealsByDate, dbLoading]);
   useEffect(() => { if (!dbLoading) save('favFoods', favoriteFoods); }, [favoriteFoods, dbLoading]);
 
-  const todayMeals = mealsByDate[getToday()] || [];
+  const todayMeals = useMemo(() => mealsByDate[selectedDate] || [], [mealsByDate, selectedDate]);
 
   const addMeal = useCallback(async (meal) => {
-    const today = getToday();
+    const today = selectedDate;
     const newId = uid();
     const newMeal = { ...meal, id: newId };
     setMealsByDate(prev => {
@@ -528,20 +537,20 @@ export function AppProvider({ children, session }) {
         qty: meal.qty || 1
       });
     }
-  }, [session]);
+  }, [session, selectedDate]);
 
   const removeMeal = useCallback(async (mealId) => {
-    const today = getToday();
+    const today = selectedDate;
     setMealsByDate(prev => {
       return { ...prev, [today]: (prev[today] || []).filter(m => m.id !== mealId) };
     });
     if (session?.user?.id) {
       await supabase.from('meals').delete().eq('id', mealId).eq('user_id', session.user.id);
     }
-  }, [session]);
+  }, [session, selectedDate]);
 
   const editMeal = useCallback(async (mealId, updates) => {
-    const today = getToday();
+    const today = selectedDate;
     setMealsByDate(prev => {
       return { ...prev, [today]: (prev[today] || []).map(m => m.id === mealId ? { ...m, ...updates } : m) };
     });
@@ -563,7 +572,7 @@ export function AppProvider({ children, session }) {
         });
       }
     }
-  }, [session, mealsByDate]);
+  }, [session, mealsByDate, selectedDate]);
 
   const toggleFavorite = useCallback(async (food) => {
     const exists = favoriteFoods.find(f => f.id === food.id);
@@ -598,7 +607,7 @@ export function AppProvider({ children, session }) {
 
   // ── Water ──
   const [waterByDate, setWaterByDate] = useState(() => load('water', {}));
-  const todayWater = waterByDate[getToday()] || 0;
+  const todayWater = useMemo(() => waterByDate[selectedDate] || 0, [waterByDate, selectedDate]);
   
   useEffect(() => { if (!dbLoading) save('water', waterByDate); }, [waterByDate, dbLoading]);
 
@@ -621,13 +630,13 @@ export function AppProvider({ children, session }) {
   }, [session]);
 
   const addWater = useCallback(async (amount) => {
-    const today = getToday();
+    const today = selectedDate;
     const newWater = Math.max(0, (waterByDate[today] || 0) + amount);
     setWaterByDate(prev => ({ ...prev, [today]: newWater }));
     if (session?.user?.id) {
       await upsertDailyMetric(today, { water: newWater });
     }
-  }, [session, waterByDate, upsertDailyMetric]);
+  }, [session, waterByDate, upsertDailyMetric, selectedDate]);
 
   // ── Bodyweight ──
   const [bodyweightLog, setBodyweightLog] = useState(() => load('bodyweight', []));
@@ -636,7 +645,7 @@ export function AppProvider({ children, session }) {
   useEffect(() => { if (!dbLoading) save('bodyweight', bodyweightLog); }, [bodyweightLog, dbLoading]);
 
   const addBodyweight = useCallback(async (weight) => {
-    const today = getToday();
+    const today = selectedDate;
     setBodyweightLog(prev => {
       const filtered = prev.filter(e => e.date !== today);
       return [...filtered, { date: today, weight }];
@@ -644,22 +653,22 @@ export function AppProvider({ children, session }) {
     if (session?.user?.id) {
       await upsertDailyMetric(today, { bodyweight: weight });
     }
-  }, [session, upsertDailyMetric]);
+  }, [session, upsertDailyMetric, selectedDate]);
 
   // ── Steps ──
   const [stepsByDate, setStepsByDate] = useState(() => load('steps', {}));
-  const todaySteps = stepsByDate[getToday()] || 0;
+  const todaySteps = useMemo(() => stepsByDate[selectedDate] || 0, [stepsByDate, selectedDate]);
 
   useEffect(() => { if (!dbLoading) save('steps', stepsByDate); }, [stepsByDate, dbLoading]);
 
   const addSteps = useCallback(async (count) => {
-    const today = getToday();
+    const today = selectedDate;
     const newSteps = (stepsByDate[today] || 0) + count;
     setStepsByDate(prev => ({ ...prev, [today]: newSteps }));
     if (session?.user?.id) {
       await upsertDailyMetric(today, { steps: newSteps });
     }
-  }, [session, stepsByDate, upsertDailyMetric]);
+  }, [session, stepsByDate, upsertDailyMetric, selectedDate]);
 
   // ── Activities ──
   const [activities, setActivities] = useState(() => load('activities', []));
@@ -851,39 +860,9 @@ export function AppProvider({ children, session }) {
     todaySteps, addSteps,
     activities, liveActivity, startLiveActivity, stopLiveActivity, cancelLiveActivity, weekActivityStats,
     streak,
-    needsOnboarding, completeOnboarding
+    needsOnboarding, completeOnboarding,
+    selectedDate, setSelectedDate, dbLoading
   };
-
-  if (dbLoading) {
-    return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--bg-primary, #09090b)',
-        color: 'var(--text-primary, #ffffff)',
-        fontFamily: 'Inter, sans-serif'
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid rgba(255,255,255,0.1)',
-          borderTopColor: 'var(--accent-color, #10b981)',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          marginBottom: '16px'
-        }} />
-        <span style={{ fontSize: '15px', fontWeight: 500, opacity: 0.8 }}>Syncing with cloud database...</span>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

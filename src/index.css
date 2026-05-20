@@ -587,3 +587,56 @@ body {
   color: var(--btn-primary-text);
   border-color: var(--btn-primary-bg);
 }
+
+/* ── Skeleton Loading ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-surface-elevated) 50%, var(--bg-surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+  border-radius: var(--radius-md);
+  color: transparent !important;
+  border: none !important;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-surface-elevated) 50%, var(--bg-surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+.skeleton-title {
+  height: 24px;
+  border-radius: 6px;
+  width: 50%;
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-surface-elevated) 50%, var(--bg-surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-surface-elevated) 50%, var(--bg-surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+/* Sync Spinner Rotate Animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1.5s linear infinite;
+}
+

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, ChevronRight, Play, MoreHorizontal, Dumbbell, History, Repeat, Plus, X, Check, Clock, Pause, Square, Copy, Trash2, ChevronLeft, Timer, Award } from 'lucide-react';
+import { Calendar, ChevronRight, Play, X, Dumbbell, History, Repeat, Trash2, Check, Clock, Copy, Award, Timer } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { getExercise, EXERCISE_DB, WORKOUT_TEMPLATES } from '../data/presets';
+import { getExercise, WORKOUT_TEMPLATES } from '../data/presets';
 
 /* ── Active Workout Session ── */
 function ActiveSession({ session, onToggleSet, onUpdateSet, onAddSet, onRemoveSet, onFinish, onCancel, restTimer, onStartRest, onCancelRest }) {
@@ -213,6 +213,7 @@ export default function WorkoutPlanner() {
     activeSession, startWorkoutSession, toggleSetComplete, updateSetData, addSetToExercise, removeSetFromExercise,
     finishWorkout, cancelWorkout, restTimer, startRestTimer, cancelRestTimer,
     workoutHistory, personalRecords,
+    selectedDate, setSelectedDate, dbLoading, mealsByDate
   } = useApp();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -225,18 +226,76 @@ export default function WorkoutPlanner() {
       restTimer={restTimer} onStartRest={startRestTimer} onCancelRest={cancelRestTimer} />;
   }
 
-  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const now = new Date();
-  const mondayDate = new Date(now);
-  mondayDate.setDate(now.getDate() - todayDayIndex);
+  const getToday = () => new Date().toISOString().split('T')[0];
 
-  const weekDays = activePlan?.schedule?.map((label, i) => {
-    const d = new Date(mondayDate);
-    d.setDate(mondayDate.getDate() + i);
-    return { day: dayLabels[i], date: String(d.getDate()), active: i === todayDayIndex, workout: label };
-  }) || [];
+  // Check if a workout has been completed on the selectedDate
+  const completedWorkout = useMemo(() => {
+    return workoutHistory.find(w => w.date === selectedDate) || null;
+  }, [workoutHistory, selectedDate]);
+
+  // Calculate Monday of the current week (local time)
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const todayDateObj = new Date();
+  const todayDay = todayDateObj.getDay();
+  const todayDayIdx = todayDay === 0 ? 6 : todayDay - 1; // Mon=0 .. Sun=6
+  const mondayDate = new Date(todayDateObj);
+  mondayDate.setDate(todayDateObj.getDate() - todayDayIdx);
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mondayDate);
+      d.setDate(mondayDate.getDate() + i);
+      
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dateNumStr = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dateNumStr}`;
+      
+      const hasWorkout = workoutHistory.some(w => w.date === dateStr);
+      const hasMeals = (mealsByDate[dateStr] && mealsByDate[dateStr].length > 0);
+      const scheduleLabel = activePlan?.schedule?.[i] || 'Rest';
+      
+      return {
+        day: dayLabels[i],
+        dateNum: d.getDate(),
+        dateStr,
+        active: dateStr === selectedDate,
+        workout: scheduleLabel,
+        hasWorkout,
+        hasMeals
+      };
+    });
+  }, [selectedDate, workoutHistory, mealsByDate, activePlan]);
 
   const todayDayData = todayWorkout;
+
+  // Show skeleton screen if data is loading and cache is completely empty
+  const showSkeleton = dbLoading && (workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0 && !localStorage.getItem('ascend_profile'));
+
+  if (showSkeleton) {
+    return (
+      <div className="p-screen fade-in">
+        {/* Header Skeleton */}
+        <header className="flex-row justify-between mb-section" style={{ marginTop: 20 }}>
+          <div className="skeleton-title" style={{ width: '40%', height: 32 }} />
+          <div className="skeleton" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+        </header>
+
+        {/* Plan Selector Skeleton */}
+        <div className="skeleton mb-section" style={{ width: '100%', height: 56 }} />
+
+        {/* Weekly strip Skeleton */}
+        <div className="flex-row mb-section" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="skeleton" style={{ minWidth: 64, height: 78 }} />
+          ))}
+        </div>
+
+        {/* Routine Card Skeleton */}
+        <div className="skeleton" style={{ width: '100%', height: 160 }} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-screen fade-in">
@@ -262,46 +321,62 @@ export default function WorkoutPlanner() {
         <h2 className="text-h2" style={{ fontSize: 18, marginBottom: 16 }}>This Week</h2>
         <div className="flex-row" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
           {weekDays.map((item, i) => (
-            <div key={i} className={`card ${item.active ? 'card-elevated' : ''}`} style={{
-              minWidth: 64, padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center',
-              border: item.active ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-              opacity: (!item.active && item.workout === 'Rest') ? 0.5 : 1
-            }}>
+            <button key={i} className={`card ${item.active ? 'card-elevated' : ''}`}
+              onClick={() => setSelectedDate(item.dateStr)}
+              style={{
+                minWidth: 64, padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                border: item.active ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                background: item.active ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
+                opacity: (!item.active && item.workout === 'Rest') ? 0.5 : 1,
+                cursor: 'pointer', outline: 'none'
+              }}>
               <span className="text-caption" style={{ color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)', fontSize: 11 }}>{item.day}</span>
-              <span className="text-h2" style={{ margin: '6px 0', fontSize: 20, color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.date}</span>
+              <span className="text-h2" style={{ margin: '6px 0', fontSize: 20, color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.dateNum}</span>
               <span style={{ fontSize: 10, fontWeight: 500, color: item.active ? 'var(--accent-blue)' : 'var(--text-tertiary)' }}>{item.workout}</span>
-            </div>
+            </button>
           ))}
         </div>
       </section>
 
-      {/* Today's Routine */}
+      {/* Selected Date's Routine Details */}
       <section className="mb-section">
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: 24, background: 'linear-gradient(180deg, var(--bg-surface-elevated) 0%, var(--bg-surface) 100%)' }}>
-            <span className="text-caption text-orange">Today's Routine</span>
-            <h2 className="text-h2" style={{ marginTop: 8, marginBottom: 16 }}>
-              {todayDayData ? todayDayData.name : 'Rest Day'}
-            </h2>
+        {completedWorkout ? (
+          <div className="card" style={{ padding: 24, background: 'linear-gradient(180deg, rgba(50, 215, 75, 0.05) 0%, var(--bg-surface) 100%)', border: '1px solid var(--accent-green-dim)' }}>
+            <span className="badge badge-green" style={{ marginBottom: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={12} /> Workout Completed</span>
+            <h2 className="text-h2" style={{ marginBottom: 8 }}>{completedWorkout.planName}</h2>
+            <div className="flex-row gap-md text-label" style={{ fontSize: 14 }}>
+              <span className="flex-row gap-sm" style={{ alignItems: 'center' }}><Clock size={16} /> {completedWorkout.duration} Min</span>
+              <span className="flex-row gap-sm" style={{ alignItems: 'center' }}><Dumbbell size={16} /> {completedWorkout.exercises} Exercises</span>
+              <span>{(completedWorkout.totalVolume / 1000).toFixed(1)}k kg volume</span>
+            </div>
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: 24, background: 'linear-gradient(180deg, var(--bg-surface-elevated) 0%, var(--bg-surface) 100%)' }}>
+              <span className="text-caption text-orange">{selectedDate === getToday() ? "Today's Routine" : "Scheduled Routine"}</span>
+              <h2 className="text-h2" style={{ marginTop: 8, marginBottom: 16 }}>
+                {todayDayData ? todayDayData.name : 'Rest Day'}
+              </h2>
+              {todayDayData && (
+                <div className="flex-row gap-md text-label">
+                  <span className="flex-row gap-sm"><Dumbbell size={16} /> {todayDayData.exercises.length} Exercises</span>
+                  <span className="flex-row gap-sm"><Calendar size={16} /> 45-60 Min</span>
+                </div>
+              )}
+            </div>
             {todayDayData && (
-              <div className="flex-row gap-md text-label">
-                <span className="flex-row gap-sm"><Dumbbell size={16} /> {todayDayData.exercises.length} Exercises</span>
-                <span className="flex-row gap-sm"><Calendar size={16} /> 45-60 Min</span>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-subtle)' }}>
+                <button className="btn btn-primary" style={{ width: '100%', gap: 8 }} onClick={() => startWorkoutSession(todayDayData)}>
+                  <Play size={18} fill="var(--btn-primary-text)" /> Start Workout
+                </button>
               </div>
             )}
           </div>
-          {todayDayData && (
-            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-subtle)' }}>
-              <button className="btn btn-primary" style={{ width: '100%', gap: 8 }} onClick={() => startWorkoutSession(todayDayData)}>
-                <Play size={18} fill="var(--btn-primary-text)" /> Start Workout
-              </button>
-            </div>
-          )}
-        </div>
+        )}
       </section>
 
-      {/* Exercises List */}
-      {todayDayData && (
+      {/* Exercises List (only when routine is scheduled and not completed yet) */}
+      {!completedWorkout && todayDayData && (
         <section className="mb-section">
           <h2 className="text-h2" style={{ fontSize: 18, marginBottom: 16 }}>Exercises</h2>
           <div className="flex-col gap-sm">
