@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { Flame } from 'lucide-react';
 import '../index.css';
 
 export default function Auth({ onLogin }) {
@@ -23,8 +24,6 @@ export default function Auth({ onLogin }) {
         if (data?.session) {
           onLogin(data.session);
         } else {
-          // If email confirmation is disabled, user is immediately logged in.
-          // Otherwise, notify them.
           setError("Signup successful! You can now log in using your credentials.");
           setIsSignUp(false);
         }
@@ -63,44 +62,220 @@ export default function Auth({ onLogin }) {
   };
 
   return (
-    <div className="auth-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', padding: '20px', background: 'var(--bg-primary)' }}>
-      <div className="auth-card" style={{ background: 'var(--bg-secondary)', padding: '30px', borderRadius: '24px', width: '100%', maxWidth: '400px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ textAlign: 'center', marginBottom: '24px', fontSize: '28px', color: 'var(--text-primary)' }}>
-          {isSignUp ? 'Create Account' : 'Welcome Back'}
-        </h1>
-        {error && <div style={{ background: 'rgba(255,59,48,0.1)', color: 'var(--system-red)', padding: '12px', borderRadius: '12px', marginBottom: '16px', fontSize: '14px', textAlign: 'center' }}>{error}</div>}
-        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>Email</label>
+    <div className="auth-container" style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '100vh', 
+      padding: '24px', 
+      background: 'radial-gradient(circle at 50% 0%, #1c1917 0%, var(--bg-amoled) 70%)',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Decorative Blur Halos */}
+      <div style={{
+        position: 'absolute',
+        width: '350px',
+        height: '350px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(50, 215, 75, 0.08) 0%, rgba(0,0,0,0) 70%)',
+        top: '-10%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        filter: 'blur(40px)',
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
+
+      <div style={{
+        position: 'absolute',
+        width: '450px',
+        height: '450px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(10, 132, 255, 0.05) 0%, rgba(0,0,0,0) 70%)',
+        bottom: '-10%',
+        right: '-10%',
+        filter: 'blur(50px)',
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
+
+      <div className="auth-card fade-in" style={{ 
+        background: 'rgba(18, 18, 18, 0.55)', 
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)',
+        padding: '36px 30px', 
+        borderRadius: 'var(--radius-lg, 24px)', 
+        width: '100%', 
+        maxWidth: '400px', 
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Brand Logo Header */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, var(--accent-green) 0%, #10b981 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 20px rgba(50, 215, 75, 0.3)',
+            marginBottom: '16px'
+          }}>
+            <Flame size={32} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
+          </div>
+          <h1 style={{ 
+            fontSize: '28px', 
+            fontWeight: 800, 
+            color: 'var(--text-primary)', 
+            letterSpacing: '-1px',
+            textAlign: 'center',
+            marginBottom: '6px'
+          }}>
+            {isSignUp ? 'Create Account' : 'Welcome to Ascend'}
+          </h1>
+          <p style={{
+            fontSize: '14px',
+            color: 'var(--text-secondary)',
+            textAlign: 'center'
+          }}>
+            {isSignUp ? 'Join the premium fitness tracker' : 'Sign in to sync your fitness journey'}
+          </p>
+        </div>
+
+        {error && (
+          <div style={{ 
+            background: 'rgba(255, 69, 58, 0.08)', 
+            border: '1px solid rgba(255, 69, 58, 0.15)',
+            color: 'var(--accent-red, #ff453a)', 
+            padding: '14px', 
+            borderRadius: '14px', 
+            marginBottom: '20px', 
+            fontSize: '14px', 
+            textAlign: 'center',
+            fontWeight: 500,
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ 
+              fontSize: '13px', 
+              fontWeight: 600, 
+              color: 'var(--text-secondary)',
+              letterSpacing: '0.3px',
+              textTransform: 'uppercase',
+              paddingLeft: '4px'
+            }}>
+              Email
+            </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="Enter your email"
-              style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '16px' }}
+              placeholder="name@example.com"
+              style={{ 
+                width: '100%', 
+                padding: '16px', 
+                borderRadius: '14px', 
+                border: '1px solid rgba(255, 255, 255, 0.08)', 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                color: 'var(--text-primary)', 
+                fontSize: '16px',
+                outline: 'none',
+                transition: 'all 0.25s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = 'var(--accent-green)';
+                e.target.style.background = 'rgba(255,255,255,0.05)';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                e.target.style.background = 'rgba(255, 255, 255, 0.03)';
+              }}
             />
           </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: 'var(--text-secondary)' }}>Password</label>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ 
+              fontSize: '13px', 
+              fontWeight: 600, 
+              color: 'var(--text-secondary)',
+              letterSpacing: '0.3px',
+              textTransform: 'uppercase',
+              paddingLeft: '4px'
+            }}>
+              Password
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="Enter your password"
-              style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', fontSize: '16px' }}
+              placeholder="••••••••"
+              style={{ 
+                width: '100%', 
+                padding: '16px', 
+                borderRadius: '14px', 
+                border: '1px solid rgba(255, 255, 255, 0.08)', 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                color: 'var(--text-primary)', 
+                fontSize: '16px',
+                outline: 'none',
+                transition: 'all 0.25s ease'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = 'var(--accent-green)';
+                e.target.style.background = 'rgba(255,255,255,0.05)';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                e.target.style.background = 'rgba(255, 255, 255, 0.03)';
+              }}
             />
           </div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '16px', borderRadius: '12px', background: 'var(--accent-primary)', color: 'white', fontWeight: 600, fontSize: '16px', border: 'none', cursor: 'pointer', marginTop: '8px', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Log In'}
+
+          <button 
+            type="submit" 
+            disabled={loading} 
+            style={{ 
+              width: '100%', 
+              padding: '16px', 
+              borderRadius: '14px', 
+              background: 'linear-gradient(135deg, var(--accent-green) 0%, #059669 100%)', 
+              color: '#ffffff', 
+              fontWeight: 700, 
+              fontSize: '16px', 
+              border: 'none', 
+              cursor: 'pointer', 
+              marginTop: '10px', 
+              opacity: loading ? 0.7 : 1,
+              boxShadow: '0 8px 24px rgba(50, 215, 75, 0.25)',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            {loading ? 'Securing Portal...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
         </form>
 
-        <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: 'var(--text-tertiary)' }}>
-          <div style={{ flex: 1, height: '1px', background: 'var(--border-color, rgba(255,255,255,0.1))' }} />
-          <span style={{ padding: '0 10px', fontSize: '14px', opacity: 0.6 }}>or</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--border-color, rgba(255,255,255,0.1))' }} />
+        <div style={{ display: 'flex', alignItems: 'center', margin: '24px 0 20px 0', color: 'var(--text-tertiary)' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.06)' }} />
+          <span style={{ padding: '0 12px', fontSize: '13px', opacity: 0.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>or</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.06)' }} />
         </div>
 
         <button 
@@ -110,19 +285,27 @@ export default function Auth({ onLogin }) {
           style={{ 
             width: '100%', 
             padding: '14px', 
-            borderRadius: '12px', 
-            background: 'transparent', 
+            borderRadius: '14px', 
+            background: 'rgba(255, 255, 255, 0.02)', 
             color: 'var(--text-primary)', 
             fontWeight: 600, 
-            fontSize: '16px', 
-            border: '1px solid var(--border-color, rgba(255,255,255,0.15))', 
+            fontSize: '15px', 
+            border: '1px solid rgba(255, 255, 255, 0.08)', 
             cursor: 'pointer', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
-            gap: '10px', 
+            gap: '12px', 
             opacity: loading ? 0.7 : 1,
-            transition: 'background 0.2s'
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -134,12 +317,23 @@ export default function Auth({ onLogin }) {
           Continue with Google
         </button>
 
-        <div style={{ marginTop: '24px', textAlign: 'center' }}>
+        <div style={{ marginTop: '28px', textAlign: 'center' }}>
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: 'var(--accent-green)', 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              opacity: 0.9,
+              transition: 'opacity 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseOut={(e) => e.currentTarget.style.opacity = '0.9'}
           >
-            {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
+            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
           </button>
         </div>
       </div>

@@ -9,10 +9,15 @@ import ActivityTracker from './components/ActivityTracker';
 import ProgressSystem from './components/ProgressSystem';
 import Settings from './components/Settings';
 import BottomNav from './components/BottomNav';
+import Onboarding from './components/Onboarding';
 
 function AppContent({ session }) {
   const [activeTab, setActiveTab] = useState('home');
-  const { restTimer, cancelRestTimer } = useApp();
+  const { restTimer, cancelRestTimer, needsOnboarding } = useApp();
+
+  if (needsOnboarding) {
+    return <Onboarding />;
+  }
 
   const renderTab = () => {
     switch (activeTab) {

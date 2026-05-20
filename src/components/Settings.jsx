@@ -123,6 +123,7 @@ export default function Settings({ session }) {
   const [editGoal, setEditGoal] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showWeightModal, setShowWeightModal] = useState(false);
+  const [showRecalc, setShowRecalc] = useState(false);
 
   const themeOptions = [
     { id: 'dark', icon: Moon, label: 'Dark' },
@@ -186,7 +187,25 @@ export default function Settings({ session }) {
 
       {/* Goals */}
       <section className="mb-section">
-        <span className="text-caption" style={{ marginBottom: 12, display: 'block' }}>Daily Goals</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <span className="text-caption" style={{ margin: 0 }}>Daily Goals</span>
+          <button 
+            onClick={() => setShowRecalc(true)} 
+            style={{ 
+              background: 'rgba(10, 132, 255, 0.1)', 
+              border: 'none', 
+              color: 'var(--accent-blue)', 
+              fontSize: '12px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontFamily: 'inherit'
+            }}
+          >
+            Formula Options
+          </button>
+        </div>
         <div className="card" style={{ padding: '4px 20px' }}>
           <SettingRow icon={Flame} iconColor="#ff453a" label="Calories" sub={`${goals.calories} kcal`}>
             <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'calories', label: 'Daily Calorie Goal', value: goals.calories, unit: 'kcal', step: 50, max: 10000 })}>
@@ -298,6 +317,172 @@ export default function Settings({ session }) {
         <EditGoalModal label="Log Bodyweight" value={currentWeight} unit={units.weight} step={0.1}
           onSave={v => addBodyweight(v)} onClose={() => setShowWeightModal(false)} />
       )}
+      {showRecalc && (
+        <RecalculateMacrosModal
+          profile={profile}
+          currentWeight={currentWeight}
+          weightUnit={units.weight}
+          goals={goals}
+          setGoals={setGoals}
+          onClose={() => setShowRecalc(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function RecalculateMacrosModal({ profile, currentWeight, weightUnit, goals, setGoals, onClose }) {
+  const [strategy, setStrategy] = useState('Moderate');
+  const [customDeficit, setCustomDeficit] = useState('500');
+  const [splitMode, setSplitMode] = useState('Standard');
+  const [customP, setCustomP] = useState(30);
+  const [customC, setCustomC] = useState(40);
+  const [customF, setCustomF] = useState(30);
+
+  const isCustomSplitValid = (parseInt(customP) + parseInt(customC) + parseInt(customF)) === 100;
+
+  const handleRecalculate = () => {
+    let deficit = 500;
+    if (strategy === 'Conservative') deficit = 250;
+    else if (strategy === 'Aggressive') deficit = 1000;
+    else if (strategy === 'Custom') deficit = parseInt(customDeficit) || 500;
+
+    const isMetric = weightUnit === 'kg';
+    const weightKg = isMetric ? currentWeight : currentWeight * 0.453592;
+    const goalWeightKg = goals.weight 
+      ? (isMetric ? goals.weight : goals.weight * 0.453592)
+      : weightKg * 0.9;
+    
+    const heightCm = profile.height || 175;
+    const age = profile.age || 25;
+    const gender = profile.gender || 'Other';
+
+    let bmr = 0;
+    if (gender === 'Male') {
+      bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+    } else if (gender === 'Female') {
+      bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+    } else {
+      bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 78;
+    }
+
+    const tdee = Math.round(bmr * 1.375);
+    const calGoal = Math.max(1200, Math.round(tdee - deficit));
+
+    let proteinGoal = goals.protein;
+    let fatGoal = goals.fats;
+    let carbGoal = goals.carbs;
+
+    if (splitMode === 'Standard') {
+      proteinGoal = Math.round(goalWeightKg * 2.0);
+      fatGoal = Math.round((calGoal * 0.25) / 9);
+      carbGoal = Math.max(50, Math.round((calGoal - (proteinGoal * 4) - (fatGoal * 9)) / 4));
+    } else if (splitMode === 'HighProtein') {
+      proteinGoal = Math.round(goalWeightKg * 2.4);
+      fatGoal = Math.round((calGoal * 0.20) / 9);
+      carbGoal = Math.max(50, Math.round((calGoal - (proteinGoal * 4) - (fatGoal * 9)) / 4));
+    } else if (splitMode === 'Keto') {
+      proteinGoal = Math.round((calGoal * 0.15) / 4);
+      fatGoal = Math.round((calGoal * 0.70) / 9);
+      carbGoal = Math.max(20, Math.round((calGoal * 0.15) / 4));
+    } else if (splitMode === 'Balanced') {
+      proteinGoal = Math.round((calGoal * 0.30) / 4);
+      fatGoal = Math.round((calGoal * 0.30) / 9);
+      carbGoal = Math.round((calGoal * 0.40) / 4);
+    } else if (splitMode === 'Custom') {
+      if (!isCustomSplitValid) return;
+      proteinGoal = Math.round((calGoal * (customP / 100)) / 4);
+      fatGoal = Math.round((calGoal * (customF / 100)) / 9);
+      carbGoal = Math.round((calGoal * (customC / 100)) / 4);
+    }
+
+    setGoals({
+      ...goals,
+      calories: calGoal,
+      protein: proteinGoal,
+      fats: fatGoal,
+      carbs: carbGoal
+    });
+    onClose();
+  };
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ paddingBottom: '30px' }}>
+        <div className="modal-handle" />
+        <div className="modal-header">
+          <span style={{ fontSize: 18, fontWeight: 600 }}>Configure Target Formula</span>
+          <button 
+            className="btn btn-sm btn-primary" 
+            disabled={splitMode === 'Custom' && !isCustomSplitValid}
+            onClick={handleRecalculate}
+          >
+            Apply
+          </button>
+        </div>
+        <div className="modal-body flex-col gap-lg" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          
+          <div className="flex-col gap-sm">
+            <label className="text-label" style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>Deficit Strategy</label>
+            <select className="input" value={strategy} onChange={e => setStrategy(e.target.value)} style={{ padding: '12px 16px', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }}>
+              <option value="Conservative">Conservative (250 kcal deficit)</option>
+              <option value="Moderate">Moderate (500 kcal deficit)</option>
+              <option value="Aggressive">Aggressive (1000 kcal deficit)</option>
+              <option value="Custom">Custom Deficit...</option>
+            </select>
+            {strategy === 'Custom' && (
+              <input
+                className="input"
+                type="number"
+                value={customDeficit}
+                onChange={e => setCustomDeficit(e.target.value)}
+                placeholder="Deficit in kcal"
+                style={{ marginTop: '8px' }}
+              />
+            )}
+          </div>
+
+          <div className="flex-col gap-sm">
+            <label className="text-label" style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', color: 'var(--text-secondary)' }}>Macro Split Mode</label>
+            <select className="input" value={splitMode} onChange={e => setSplitMode(e.target.value)} style={{ padding: '12px 16px', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }}>
+              <option value="Standard">Standard Fitness (2.0g/kg Pro, 25% Fat)</option>
+              <option value="HighProtein">High Protein Lean (2.4g/kg Pro, 20% Fat)</option>
+              <option value="Balanced">Balanced Split (30% Pro, 30% Fat, 40% Carb)</option>
+              <option value="Keto">Keto Split (15% Pro, 70% Fat, 15% Carb)</option>
+              <option value="Custom">Custom Percentages...</option>
+            </select>
+          </div>
+
+          {splitMode === 'Custom' && (
+            <div className="flex-col gap-md" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="flex-col gap-sm flex-1">
+                  <label className="text-label" style={{ fontSize: '13px' }}>Protein %</label>
+                  <input className="input" type="number" value={customP} onChange={e => setCustomP(parseInt(e.target.value) || 0)} style={{ textAlign: 'center' }} />
+                </div>
+                <div className="flex-col gap-sm flex-1">
+                  <label className="text-label" style={{ fontSize: '13px' }}>Carbs %</label>
+                  <input className="input" type="number" value={customC} onChange={e => setCustomC(parseInt(e.target.value) || 0)} style={{ textAlign: 'center' }} />
+                </div>
+                <div className="flex-col gap-sm flex-1">
+                  <label className="text-label" style={{ fontSize: '13px' }}>Fats %</label>
+                  <input className="input" type="number" value={customF} onChange={e => setCustomF(parseInt(e.target.value) || 0)} style={{ textAlign: 'center' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <span style={{ fontSize: '13px', color: isCustomSplitValid ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 600 }}>
+                  Total: {parseInt(customP) + parseInt(customC) + parseInt(customF)}%
+                </span>
+                <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                  Must sum to 100%
+                </span>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

@@ -15,6 +15,7 @@ function save(key, val) { localStorage.setItem(`ascend_${key}`, JSON.stringify(v
 
 export function AppProvider({ children, session }) {
   const [dbLoading, setDbLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [theme, setTheme] = useState(() => load('theme', 'dark'));
   const [units, setUnits] = useState(() => load('units', { weight: 'kg', distance: 'km' }));
   const [goals, setGoals] = useState(() => load('goals', { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 }));
@@ -100,137 +101,9 @@ export function AppProvider({ children, session }) {
         if (profileError) throw profileError;
 
         if (!profileData) {
-          const newProfile = {
-            id: session.user.id,
-            name: profile.name,
-            age: profile.age,
-            height: profile.height,
-            gender: profile.gender,
-            theme,
-            units,
-            goals,
-            notifications
-          };
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert(newProfile);
-          if (insertError) throw insertError;
-
-          // Migrate local storage data to Supabase
-          const localCustomPlans = load('customPlans', []);
-          if (localCustomPlans.length > 0) {
-            for (const p of localCustomPlans) {
-              await supabase.from('custom_plans').insert({
-                id: p.id,
-                user_id: session.user.id,
-                name: p.name,
-                short_name: p.shortName,
-                schedule: p.schedule,
-                days: p.days
-              });
-            }
-          }
-
-          const localWorkoutHistory = load('workoutHistory', []);
-          if (localWorkoutHistory.length > 0) {
-            for (const h of localWorkoutHistory) {
-              await supabase.from('workout_history').insert({
-                id: h.id,
-                user_id: session.user.id,
-                plan_name: h.planName,
-                date: h.date,
-                duration: h.duration,
-                exercises: h.exercises,
-                total_volume: h.totalVolume
-              });
-            }
-          }
-
-          const localPRs = load('prs', {});
-          const prKeys = Object.keys(localPRs);
-          if (prKeys.length > 0) {
-            for (const key of prKeys) {
-              await supabase.from('personal_records').upsert({
-                user_id: session.user.id,
-                exercise_id: key,
-                weight: localPRs[key]
-              });
-            }
-          }
-
-          const localMeals = load('meals', {});
-          const mealDates = Object.keys(localMeals);
-          if (mealDates.length > 0) {
-            for (const d of mealDates) {
-              for (const m of (localMeals[d] || [])) {
-                await supabase.from('meals').insert({
-                  id: m.id,
-                  user_id: session.user.id,
-                  date: d,
-                  name: m.name,
-                  calories: m.calories,
-                  protein: m.protein,
-                  carbs: m.carbs,
-                  fats: m.fats,
-                  qty: m.qty || 1
-                });
-              }
-            }
-          }
-
-          const localFavFoods = load('favFoods', []);
-          if (localFavFoods.length > 0) {
-            for (const f of localFavFoods) {
-              await supabase.from('favorite_foods').insert({
-                id: f.id,
-                user_id: session.user.id,
-                name: f.name,
-                calories: f.calories,
-                protein: f.protein,
-                carbs: f.carbs,
-                fats: f.fats
-              });
-            }
-          }
-
-          const localWater = load('water', {});
-          const localSteps = load('steps', {});
-          const localWeight = load('bodyweight', []);
-          const allDates = new Set([
-            ...Object.keys(localWater),
-            ...Object.keys(localSteps),
-            ...localWeight.map(b => b.date)
-          ]);
-          if (allDates.size > 0) {
-            for (const d of allDates) {
-              const wt = localWeight.find(b => b.date === d)?.weight || null;
-              await supabase.from('daily_metrics').insert({
-                user_id: session.user.id,
-                date: d,
-                water: localWater[d] || 0,
-                steps: localSteps[d] || 0,
-                bodyweight: wt
-              });
-            }
-          }
-
-          const localActivities = load('activities', []);
-          if (localActivities.length > 0) {
-            for (const a of localActivities) {
-              await supabase.from('activities').insert({
-                id: a.id,
-                user_id: session.user.id,
-                type: a.type,
-                label: a.label,
-                date: a.date,
-                distance: a.distance,
-                duration: a.duration,
-                pace: a.pace,
-                calories: a.calories
-              });
-            }
-          }
+          setNeedsOnboarding(true);
         } else {
+          setNeedsOnboarding(false);
           setTheme(profileData.theme || 'dark');
           setUnits(profileData.units || { weight: 'kg', distance: 'km' });
           setGoals(profileData.goals || { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 });
@@ -241,142 +114,142 @@ export function AppProvider({ children, session }) {
             gender: profileData.gender || 'Other'
           });
           setNotifications(profileData.notifications || { workout: true, meals: true, water: true, steps: true });
-        }
 
-        // 2. Load Custom Plans
-        const { data: plansData, error: plansError } = await supabase
-          .from('custom_plans')
-          .select('*')
-          .eq('user_id', session.user.id);
-        if (plansError) throw plansError;
-        if (plansData) {
-          setCustomPlans(plansData.map(p => ({
-            id: p.id,
-            name: p.name,
-            shortName: p.short_name,
-            schedule: p.schedule,
-            days: p.days
-          })));
-        }
+          // 2. Load Custom Plans
+          const { data: plansData, error: plansError } = await supabase
+            .from('custom_plans')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (plansError) throw plansError;
+          if (plansData) {
+            setCustomPlans(plansData.map(p => ({
+              id: p.id,
+              name: p.name,
+              shortName: p.short_name,
+              schedule: p.schedule,
+              days: p.days
+            })));
+          }
 
-        // 3. Load Workout History
-        const { data: historyData, error: historyError } = await supabase
-          .from('workout_history')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('date', { ascending: false });
-        if (historyError) throw historyError;
-        if (historyData) {
-          setWorkoutHistory(historyData.map(h => ({
-            id: h.id,
-            planName: h.plan_name,
-            date: h.date,
-            duration: h.duration,
-            exercises: h.exercises,
-            totalVolume: h.total_volume
-          })));
-        }
+          // 3. Load Workout History
+          const { data: historyData, error: historyError } = await supabase
+            .from('workout_history')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('date', { ascending: false });
+          if (historyError) throw historyError;
+          if (historyData) {
+            setWorkoutHistory(historyData.map(h => ({
+              id: h.id,
+              planName: h.plan_name,
+              date: h.date,
+              duration: h.duration,
+              exercises: h.exercises,
+              totalVolume: h.total_volume
+            })));
+          }
 
-        // 4. Load Personal Records
-        const { data: prsData, error: prsError } = await supabase
-          .from('personal_records')
-          .select('*')
-          .eq('user_id', session.user.id);
-        if (prsError) throw prsError;
-        if (prsData) {
-          const prsObj = prsData.reduce((acc, pr) => {
-            acc[pr.exercise_id] = pr.weight;
-            return acc;
-          }, {});
-          setPersonalRecords(prsObj);
-        }
+          // 4. Load Personal Records
+          const { data: prsData, error: prsError } = await supabase
+            .from('personal_records')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (prsError) throw prsError;
+          if (prsData) {
+            const prsObj = prsData.reduce((acc, pr) => {
+              acc[pr.exercise_id] = pr.weight;
+              return acc;
+            }, {});
+            setPersonalRecords(prsObj);
+          }
 
-        // 5. Load Meals
-        const { data: mealsData, error: mealsError } = await supabase
-          .from('meals')
-          .select('*')
-          .eq('user_id', session.user.id);
-        if (mealsError) throw mealsError;
-        if (mealsData) {
-          const mealsByDateObj = mealsData.reduce((acc, m) => {
-            const d = m.date;
-            if (!acc[d]) acc[d] = [];
-            acc[d].push({
-              id: m.id,
-              name: m.name,
-              calories: m.calories,
-              protein: m.protein,
-              carbs: m.carbs,
-              fats: m.fats,
-              qty: m.qty
+          // 5. Load Meals
+          const { data: mealsData, error: mealsError } = await supabase
+            .from('meals')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (mealsError) throw mealsError;
+          if (mealsData) {
+            const mealsByDateObj = mealsData.reduce((acc, m) => {
+              const d = m.date;
+              if (!acc[d]) acc[d] = [];
+              acc[d].push({
+                id: m.id,
+                name: m.name,
+                calories: m.calories,
+                protein: m.protein,
+                carbs: m.carbs,
+                fats: m.fats,
+                qty: m.qty
+              });
+              return acc;
+            }, {});
+            setMealsByDate(mealsByDateObj);
+          }
+
+          // 6. Load Favorite Foods
+          const { data: favsData, error: favsError } = await supabase
+            .from('favorite_foods')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (favsError) throw favsError;
+          if (favsData) {
+            setFavoriteFoods(favsData.map(f => ({
+              id: f.id,
+              name: f.name,
+              calories: f.calories,
+              protein: f.protein,
+              carbs: f.carbs,
+              fats: f.fats
+            })));
+          }
+
+          // 7. Load Daily Metrics (Water, Steps, Bodyweight)
+          const { data: metricsData, error: metricsError } = await supabase
+            .from('daily_metrics')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (metricsError) throw metricsError;
+          if (metricsData) {
+            const waterObj = {};
+            const stepsObj = {};
+            const weightLogArr = [];
+            metricsData.forEach(m => {
+              if (m.water !== null && m.water !== undefined) {
+                waterObj[m.date] = m.water;
+              }
+              if (m.steps !== null && m.steps !== undefined) {
+                stepsObj[m.date] = m.steps;
+              }
+              if (m.bodyweight !== null && m.bodyweight !== undefined) {
+                weightLogArr.push({ date: m.date, weight: m.bodyweight });
+              }
             });
-            return acc;
-          }, {});
-          setMealsByDate(mealsByDateObj);
-        }
+            setWaterByDate(waterObj);
+            setStepsByDate(stepsObj);
+            weightLogArr.sort((a, b) => a.date.localeCompare(b.date));
+            setBodyweightLog(weightLogArr);
+          }
 
-        // 6. Load Favorite Foods
-        const { data: favsData, error: favsError } = await supabase
-          .from('favorite_foods')
-          .select('*')
-          .eq('user_id', session.user.id);
-        if (favsError) throw favsError;
-        if (favsData) {
-          setFavoriteFoods(favsData.map(f => ({
-            id: f.id,
-            name: f.name,
-            calories: f.calories,
-            protein: f.protein,
-            carbs: f.carbs,
-            fats: f.fats
-          })));
-        }
-
-        // 7. Load Daily Metrics (Water, Steps, Bodyweight)
-        const { data: metricsData, error: metricsError } = await supabase
-          .from('daily_metrics')
-          .select('*')
-          .eq('user_id', session.user.id);
-        if (metricsError) throw metricsError;
-        if (metricsData) {
-          const waterObj = {};
-          const stepsObj = {};
-          const weightLogArr = [];
-          metricsData.forEach(m => {
-            if (m.water !== null && m.water !== undefined) {
-              waterObj[m.date] = m.water;
-            }
-            if (m.steps !== null && m.steps !== undefined) {
-              stepsObj[m.date] = m.steps;
-            }
-            if (m.bodyweight !== null && m.bodyweight !== undefined) {
-              weightLogArr.push({ date: m.date, weight: m.bodyweight });
-            }
-          });
-          setWaterByDate(waterObj);
-          setStepsByDate(stepsObj);
-          weightLogArr.sort((a, b) => a.date.localeCompare(b.date));
-          setBodyweightLog(weightLogArr);
-        }
-
-        // 8. Load Activities
-        const { data: activitiesData, error: activitiesError } = await supabase
-          .from('activities')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('date', { ascending: false });
-        if (activitiesError) throw activitiesError;
-        if (activitiesData) {
-          setActivities(activitiesData.map(a => ({
-            id: a.id,
-            type: a.type,
-            label: a.label,
-            date: a.date,
-            distance: a.distance,
-            duration: a.duration,
-            pace: a.pace,
-            calories: a.calories
-          })));
+          // 8. Load Activities
+          const { data: activitiesData, error: activitiesError } = await supabase
+            .from('activities')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('date', { ascending: false });
+          if (activitiesError) throw activitiesError;
+          if (activitiesData) {
+            setActivities(activitiesData.map(a => ({
+              id: a.id,
+              type: a.type,
+              label: a.label,
+              date: a.date,
+              distance: a.distance,
+              duration: a.duration,
+              pace: a.pace,
+              calories: a.calories
+            })));
+          }
         }
       } catch (err) {
         console.error('Error loading Supabase user data:', err);
@@ -862,6 +735,107 @@ export function AppProvider({ children, session }) {
     };
   }, [activities]);
 
+  const completeOnboarding = useCallback(async (data) => {
+    setDbLoading(true);
+    try {
+      const isMetric = data.units.weight === 'kg';
+      const weightKg = isMetric ? parseFloat(data.weight) : parseFloat(data.weight) * 0.453592;
+      const heightCm = isMetric ? parseFloat(data.height) : parseFloat(data.height) * 2.54;
+      const goalWeightKg = isMetric ? parseFloat(data.goalWeight) : parseFloat(data.goalWeight) * 0.453592;
+      
+      // Calculate BMR (Harris-Benedict equation)
+      let bmr = 0;
+      if (data.gender === 'Male') {
+        bmr = 10 * weightKg + 6.25 * heightCm - 5 * parseInt(data.age) + 5;
+      } else if (data.gender === 'Female') {
+        bmr = 10 * weightKg + 6.25 * heightCm - 5 * parseInt(data.age) - 161;
+      } else {
+        bmr = 10 * weightKg + 6.25 * heightCm - 5 * parseInt(data.age) - 78; // average
+      }
+      
+      // TDEE = BMR * 1.375 (lightly active)
+      const tdee = Math.round(bmr * 1.375);
+      
+      // Deficit based on target monthly rate
+      let deficit = 500; // default Moderate
+      if (data.weightLossRate === 'Conservative') deficit = 250;
+      else if (data.weightLossRate === 'Aggressive') deficit = 1000;
+      
+      const calGoal = Math.max(1200, Math.round(tdee - deficit));
+      
+      // Protein: 2.0g per kg of target weight
+      const proteinGoal = Math.round(goalWeightKg * 2.0);
+      
+      // Fats: 25% of calories
+      const fatGoal = Math.round((calGoal * 0.25) / 9);
+      
+      // Carbs: remainder
+      const carbGoal = Math.max(50, Math.round((calGoal - (proteinGoal * 4) - (fatGoal * 9)) / 4));
+      
+      const computedGoals = {
+        calories: calGoal,
+        protein: proteinGoal,
+        carbs: carbGoal,
+        fats: fatGoal,
+        water: isMetric ? 3.0 : 100, // 3 Liters or 100 oz
+        steps: 10000,
+        weight: parseFloat(data.goalWeight) // Save target weight in goals
+      };
+
+      const computedProfile = {
+        name: data.name,
+        age: parseInt(data.age),
+        height: parseFloat(data.height),
+        gender: data.gender
+      };
+
+      // 1. Save profile to Supabase
+      const newProfile = {
+        id: session.user.id,
+        name: computedProfile.name,
+        age: computedProfile.age,
+        height: computedProfile.height,
+        gender: computedProfile.gender,
+        theme,
+        units: data.units,
+        goals: computedGoals,
+        notifications
+      };
+      
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert(newProfile);
+      
+      if (insertError) throw insertError;
+
+      // 2. Add first bodyweight record
+      const todayDate = getToday();
+      const { error: metricError } = await supabase
+        .from('daily_metrics')
+        .upsert({
+          user_id: session.user.id,
+          date: todayDate,
+          bodyweight: parseFloat(data.weight),
+          water: 0,
+          steps: 0
+        });
+      
+      if (metricError) throw metricError;
+
+      // Update local state
+      setProfile(computedProfile);
+      setGoals(computedGoals);
+      setUnits(data.units);
+      setBodyweightLog([{ date: todayDate, weight: parseFloat(data.weight) }]);
+      setNeedsOnboarding(false);
+    } catch (err) {
+      console.error('Error completing onboarding:', err);
+      alert(err.message || 'Error saving onboarding data');
+    } finally {
+      setDbLoading(false);
+    }
+  }, [session, theme, notifications]);
+
   const value = {
     theme, setTheme, resolvedTheme,
     units, setUnits, goals, setGoals, profile, setProfile, notifications, setNotifications,
@@ -877,6 +851,7 @@ export function AppProvider({ children, session }) {
     todaySteps, addSteps,
     activities, liveActivity, startLiveActivity, stopLiveActivity, cancelLiveActivity, weekActivityStats,
     streak,
+    needsOnboarding, completeOnboarding
   };
 
   if (dbLoading) {
