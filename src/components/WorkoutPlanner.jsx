@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, ChevronRight, Play, X, Dumbbell, History, Repeat, Trash2, Check, Clock, Copy, Award, Timer, Plus } from 'lucide-react';
+import { Calendar, ChevronRight, ChevronLeft, Play, X, Dumbbell, History, Repeat, Trash2, Check, Clock, Copy, Award, Timer, Plus, Edit } from 'lucide-react';
 import { useApp } from '../store/AppContext';
-import { getExercise, WORKOUT_TEMPLATES } from '../data/presets';
+import { getExercise, WORKOUT_TEMPLATES, EXERCISE_DB } from '../data/presets';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -148,7 +148,7 @@ function HistoryModal({ history, onClose }) {
 }
 
 /* ── Plan Picker Modal ── */
-function PlanPickerModal({ plans, activeId, onSelect, onDuplicate, onDelete, onClose }) {
+function PlanPickerModal({ plans, activeId, onSelect, onDuplicate, onDelete, onEdit, onCreateNew, onClose }) {
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
@@ -157,7 +157,7 @@ function PlanPickerModal({ plans, activeId, onSelect, onDuplicate, onDelete, onC
           <span style={{ fontSize: 18, fontWeight: 600 }}>Workout Plans</span>
           <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={onClose}><X size={18} /></button>
         </div>
-        <div className="modal-body">
+        <div className="modal-body" style={{ paddingBottom: 16 }}>
           <div className="flex-col gap-sm">
             {plans.map(plan => (
               <div key={plan.id} className={`card flex-row justify-between align-center`}
@@ -172,6 +172,11 @@ function PlanPickerModal({ plans, activeId, onSelect, onDuplicate, onDelete, onC
                     <Copy size={14} />
                   </button>
                   {!WORKOUT_TEMPLATES.find(t => t.id === plan.id) && (
+                    <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={e => { e.stopPropagation(); onEdit(plan.id); }}>
+                      <Edit size={14} />
+                    </button>
+                  )}
+                  {!WORKOUT_TEMPLATES.find(t => t.id === plan.id) && (
                     <button className="btn-icon" style={{ width: 32, height: 32, color: 'var(--accent-red)' }} onClick={e => { e.stopPropagation(); onDelete(plan.id); }}>
                       <Trash2 size={14} />
                     </button>
@@ -180,6 +185,11 @@ function PlanPickerModal({ plans, activeId, onSelect, onDuplicate, onDelete, onC
               </div>
             ))}
           </div>
+        </div>
+        <div className="modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'center' }}>
+          <button className="btn btn-primary" style={{ width: '100%', gap: 8 }} onClick={() => { onCreateNew(); onClose(); }}>
+            <Plus size={16} /> Create Custom Split
+          </button>
         </div>
       </div>
     </div>,
@@ -215,7 +225,7 @@ function PRSection({ personalRecords }) {
 /* ── Main WorkoutPlanner ── */
 export default function WorkoutPlanner() {
   const {
-    activePlan, activePlanId, setActivePlan, allPlans, duplicatePlan, deleteCustomPlan,
+    activePlan, activePlanId, setActivePlan, allPlans, duplicatePlan, deleteCustomPlan, addCustomPlan, editCustomPlan,
     todayWorkout,
     activeSession, startWorkoutSession, toggleSetComplete, updateSetData, addSetToExercise, removeSetFromExercise,
     finishWorkout, cancelWorkout, restTimer, startRestTimer, cancelRestTimer,
@@ -225,6 +235,7 @@ export default function WorkoutPlanner() {
 
   const [showHistory, setShowHistory] = useState(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
 
   const getToday = () => new Date().toISOString().split('T')[0];
 
@@ -234,10 +245,16 @@ export default function WorkoutPlanner() {
   }, [workoutHistory, selectedDate]);
 
   const weekDays = useMemo(() => {
-    const todayDateObj = new Date();
-    const todayDay = todayDateObj.getDay(); // Sun=0 .. Sat=6
-    const sundayDate = new Date(todayDateObj);
-    sundayDate.setDate(todayDateObj.getDate() - todayDay);
+    const parts = selectedDate.split('-');
+    let refDate;
+    if (parts.length === 3) {
+      refDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      refDate = new Date();
+    }
+    const dayOfWeek = refDate.getDay(); // Sun=0 .. Sat=6
+    const sundayDate = new Date(refDate);
+    sundayDate.setDate(refDate.getDate() - dayOfWeek);
 
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(sundayDate);
@@ -250,7 +267,11 @@ export default function WorkoutPlanner() {
       
       const hasWorkout = workoutHistory.some(w => w.date === dateStr);
       const hasMeals = (mealsByDate[dateStr] && mealsByDate[dateStr].length > 0);
-      const scheduleLabel = activePlan?.schedule?.[i] || 'Rest';
+      
+      // Fix index mismatch: schedule starts at Monday (index 0) and ends on Sunday (index 6).
+      // Sunday here is i = 0, Monday is i = 1, Saturday is i = 6.
+      const schedIdx = i === 0 ? 6 : i - 1;
+      const scheduleLabel = activePlan?.schedule?.[schedIdx] || 'Rest';
       
       return {
         day: dayLabels[i],
@@ -265,6 +286,44 @@ export default function WorkoutPlanner() {
     });
   }, [selectedDate, workoutHistory, mealsByDate, activePlan]);
 
+  const changeWeek = (offset) => {
+    const parts = selectedDate.split('-');
+    let d;
+    if (parts.length === 3) {
+      d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      d = new Date();
+    }
+    d.setDate(d.getDate() + offset);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const dateNum = String(d.getDate()).padStart(2, '0');
+    setSelectedDate(`${year}-${month}-${dateNum}`);
+  };
+
+  const goToPrevWeek = () => changeWeek(-7);
+  const goToNextWeek = () => changeWeek(7);
+  const goToToday = () => setSelectedDate(getToday());
+
+  const handleCreateNew = () => {
+    setEditingPlan({
+      id: null,
+      name: '',
+      shortName: '',
+      schedule: ['Rest', 'Rest', 'Rest', 'Rest', 'Rest', 'Rest', 'Rest'],
+      days: [
+        { name: 'Workout Day A', shortName: 'Day A', exercises: [] }
+      ]
+    });
+  };
+
+  const handleEditPlan = (planId) => {
+    const plan = allPlans.find(p => p.id === planId);
+    if (plan) {
+      setEditingPlan(JSON.parse(JSON.stringify(plan)));
+    }
+  };
+
   const todayDayData = todayWorkout;
 
   // If active session, show that instead
@@ -275,7 +334,7 @@ export default function WorkoutPlanner() {
   }
 
   // Show skeleton screen if data is loading and cache is completely empty
-  const showSkeleton = dbLoading && (workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0 && !localStorage.getItem('ascend_profile'));
+  const showSkeleton = dbLoading && workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0;
 
   if (showSkeleton) {
     return (
@@ -323,62 +382,30 @@ export default function WorkoutPlanner() {
 
       {/* Weekly Schedule */}
       <section className="mb-section">
-        <h2 className="text-h2" style={{ fontSize: 18, marginBottom: 16 }}>This Week</h2>
-        <div className="flex-row justify-between" style={{ margin: '0 -8px', padding: '0 8px', overflowX: 'auto', gap: 6 }}>
-          {weekDays.map((item, i) => {
-            const circleStyle = item.active ? {
-              border: '2.5px solid var(--text-primary)',
-              background: 'var(--bg-surface-elevated)'
-            } : item.isToday ? {
-              border: '2px solid var(--text-secondary)',
-              background: 'var(--bg-surface)'
-            } : item.hasWorkout ? {
-              border: '2px solid var(--accent-red)',
-              background: 'var(--bg-surface)'
-            } : item.hasMeals ? {
-              border: '2px solid var(--accent-green)',
-              background: 'var(--bg-surface)'
-            } : {
-              border: '1.5px dashed var(--border-subtle)',
-              background: 'transparent',
-              opacity: 0.5
-            };
-            return (
-              <button key={i}
-                onClick={() => setSelectedDate(item.dateStr)}
-                style={{
-                  background: 'none', border: 'none', padding: 0, outline: 'none', cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1, minWidth: 38
-                }}
-              >
-                <span className="text-caption" style={{ 
-                  fontSize: 11, 
-                  fontWeight: item.active ? '700' : '500',
-                  color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)'
-                }}>
-                  {item.day}
-                </span>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700,
-                  color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  ...circleStyle
-                }}>
-                  {item.dateNum}
-                </div>
-                <span style={{ 
-                  fontSize: 9, 
-                  fontWeight: 600, 
-                  color: item.active ? 'var(--accent-blue)' : 'var(--text-tertiary)',
-                  marginTop: 2,
-                  whiteSpace: 'nowrap'
-                }}>
-                  {item.workout}
-                </span>
-              </button>
-            );
-          })}
+        <div className="flex-row justify-between align-center" style={{ marginBottom: 16 }}>
+          <h2 className="text-h2" style={{ fontSize: 18 }}>Weekly Schedule</h2>
+          <div className="flex-row gap-xs">
+            <button className="btn-icon" onClick={goToPrevWeek} style={{ width: 28, height: 28, borderRadius: 6 }}><ChevronLeft size={16} /></button>
+            <button className="btn btn-secondary btn-sm" onClick={goToToday} style={{ padding: '2px 10px', fontSize: 11, height: 28, borderRadius: 6 }}>Today</button>
+            <button className="btn-icon" onClick={goToNextWeek} style={{ width: 28, height: 28, borderRadius: 6 }}><ChevronRight size={16} /></button>
+          </div>
+        </div>
+        <div className="flex-row" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
+          {weekDays.map((item, i) => (
+            <button key={i} className={`card ${item.active ? 'card-elevated' : ''}`}
+              onClick={() => setSelectedDate(item.dateStr)}
+              style={{
+                minWidth: 64, padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                border: item.active ? '1.5px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                background: item.active ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
+                opacity: (!item.active && item.workout === 'Rest') ? 0.5 : 1,
+                cursor: 'pointer', outline: 'none', flexShrink: 0
+              }}>
+              <span className="text-caption" style={{ color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)', fontSize: 11 }}>{item.day}</span>
+              <span className="text-h2" style={{ margin: '6px 0', fontSize: 20, color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.dateNum}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: item.active ? 'var(--accent-blue)' : 'var(--text-tertiary)' }}>{item.workout}</span>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -452,8 +479,298 @@ export default function WorkoutPlanner() {
       {showHistory && <HistoryModal history={workoutHistory} onClose={() => setShowHistory(false)} />}
       {showPlanPicker && (
         <PlanPickerModal plans={allPlans} activeId={activePlanId} onSelect={setActivePlan}
-          onDuplicate={duplicatePlan} onDelete={deleteCustomPlan} onClose={() => setShowPlanPicker(false)} />
+          onDuplicate={duplicatePlan} onDelete={deleteCustomPlan}
+          onEdit={(planId) => { handleEditPlan(planId); setShowPlanPicker(false); }}
+          onCreateNew={() => { handleCreateNew(); setShowPlanPicker(false); }}
+          onClose={() => setShowPlanPicker(false)} />
+      )}
+      {editingPlan && (
+        <EditPlanModal
+          plan={editingPlan}
+          onSave={async (savedPlan) => {
+            if (savedPlan.id) {
+              await editCustomPlan(savedPlan.id, savedPlan);
+            } else {
+              const newId = await addCustomPlan(savedPlan);
+              setActivePlan(newId);
+            }
+            setEditingPlan(null);
+          }}
+          onClose={() => setEditingPlan(null)}
+        />
       )}
     </div>
+  );
+}
+
+/* ── Edit Plan Modal ── */
+function EditPlanModal({ plan, onSave, onClose }) {
+  const [editedPlan, setEditedPlan] = useState(plan);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [addingExerciseToDayIdx, setAddingExerciseToDayIdx] = useState(null);
+
+  const weekdayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const handleSave = () => {
+    if (!editedPlan.name.trim()) {
+      alert('Please enter a split name.');
+      return;
+    }
+    const planToSave = !editedPlan.shortName.trim()
+      ? { ...editedPlan, shortName: editedPlan.name.substring(0, 3).toUpperCase() }
+      : editedPlan;
+    onSave(planToSave);
+  };
+
+  const handleAddDay = () => {
+    const defaultShort = `Day ${String.fromCharCode(65 + editedPlan.days.length)}`;
+    setEditedPlan({
+      ...editedPlan,
+      days: [
+        ...editedPlan.days,
+        { name: `Workout ${defaultShort}`, shortName: defaultShort, exercises: [] }
+      ]
+    });
+  };
+
+  const handleDeleteDay = (dayIdx) => {
+    const dayToDelete = editedPlan.days[dayIdx];
+    const updatedDays = editedPlan.days.filter((_, i) => i !== dayIdx);
+    const updatedSchedule = editedPlan.schedule.map(s => s === dayToDelete.shortName ? 'Rest' : s);
+    setEditedPlan({ ...editedPlan, days: updatedDays, schedule: updatedSchedule });
+  };
+
+  const handleUpdateDayShortName = (dayIdx, newShortName) => {
+    const oldShortName = editedPlan.days[dayIdx].shortName;
+    const updatedDays = editedPlan.days.map((d, i) => i === dayIdx ? { ...d, shortName: newShortName } : d);
+    const updatedSchedule = editedPlan.schedule.map(s => s === oldShortName ? newShortName : s);
+    setEditedPlan({ ...editedPlan, days: updatedDays, schedule: updatedSchedule });
+  };
+
+  const handleUpdateDayName = (dayIdx, newName) => {
+    const updatedDays = editedPlan.days.map((d, i) => i === dayIdx ? { ...d, name: newName } : d);
+    setEditedPlan({ ...editedPlan, days: updatedDays });
+  };
+
+  const handleUpdateExercise = (dayIdx, exIdx, field, value) => {
+    const updatedDays = [...editedPlan.days];
+    updatedDays[dayIdx].exercises[exIdx] = {
+      ...updatedDays[dayIdx].exercises[exIdx],
+      [field]: value
+    };
+    setEditedPlan({ ...editedPlan, days: updatedDays });
+  };
+
+  const handleDeleteExercise = (dayIdx, exIdx) => {
+    const updatedDays = [...editedPlan.days];
+    updatedDays[dayIdx].exercises = updatedDays[dayIdx].exercises.filter((_, i) => i !== exIdx);
+    setEditedPlan({ ...editedPlan, days: updatedDays });
+  };
+
+  const filteredExercises = useMemo(() => {
+    if (!searchQuery.trim()) return EXERCISE_DB;
+    return EXERCISE_DB.filter(ex => 
+      ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ex.muscle.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery]);
+
+  const handleAddExercise = (dayIdx, exerciseId) => {
+    const updatedDays = [...editedPlan.days];
+    updatedDays[dayIdx].exercises.push({
+      exerciseId,
+      sets: 3,
+      reps: '10',
+      weight: 40
+    });
+    setEditedPlan({ ...editedPlan, days: updatedDays });
+    setAddingExerciseToDayIdx(null);
+    setSearchQuery('');
+  };
+
+  const handleAddCustomExercise = (dayIdx) => {
+    if (!searchQuery.trim()) return;
+    const updatedDays = [...editedPlan.days];
+    updatedDays[dayIdx].exercises.push({
+      exerciseId: searchQuery.trim(),
+      sets: 3,
+      reps: '10',
+      weight: 40
+    });
+    setEditedPlan({ ...editedPlan, days: updatedDays });
+    setAddingExerciseToDayIdx(null);
+    setSearchQuery('');
+  };
+
+  return createPortal(
+    <div className="modal-overlay" style={{ zIndex: 200 }}>
+      <div className="modal-sheet modal-sheet-full" style={{ display: 'flex', flexDirection: 'column', height: '100vh', maxHeight: '100vh' }}>
+        {/* Header */}
+        <div className="modal-header" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-surface)' }}>
+          <button className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }} onClick={onClose}>Cancel</button>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>{plan.id ? 'Edit Workout Split' : 'Create Custom Split'}</span>
+          <button className="btn btn-primary btn-sm" style={{ padding: '6px 16px' }} onClick={handleSave}>Save</button>
+        </div>
+
+        {/* Content Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          
+          {/* Plan Settings */}
+          <section className="mb-section">
+            <h3 className="text-h3" style={{ fontSize: 16, marginBottom: 12 }}>Split Profile</h3>
+            <div className="flex-col gap-sm">
+              <div>
+                <label className="text-label" style={{ display: 'block', marginBottom: 6, fontSize: 12 }}>Split Name</label>
+                <input type="text" className="input" placeholder="e.g. My Arnold Split" 
+                  value={editedPlan.name} onChange={e => setEditedPlan({ ...editedPlan, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="text-label" style={{ display: 'block', marginBottom: 6, fontSize: 12 }}>Abbreviation (max 6 letters)</label>
+                <input type="text" className="input" placeholder="e.g. ARN" maxLength={6}
+                  value={editedPlan.shortName} onChange={e => setEditedPlan({ ...editedPlan, shortName: e.target.value.toUpperCase() })} />
+              </div>
+            </div>
+          </section>
+
+          {/* Schedule Configuration */}
+          <section className="mb-section">
+            <h3 className="text-h3" style={{ fontSize: 16, marginBottom: 12 }}>Weekly Schedule</h3>
+            <div className="card flex-col gap-sm" style={{ padding: 16 }}>
+              {weekdayNames.map((name, idx) => (
+                <div key={name} className="flex-row justify-between align-center" style={{ padding: '4px 0' }}>
+                  <span className="text-body" style={{ fontSize: 14, fontWeight: 600 }}>{name}</span>
+                  <select className="input" style={{ width: 160, padding: '6px 10px', borderRadius: 8, fontSize: 14, background: 'var(--input-bg)' }}
+                    value={editedPlan.schedule[idx] || 'Rest'}
+                    onChange={e => {
+                      const updatedSchedule = [...editedPlan.schedule];
+                      updatedSchedule[idx] = e.target.value;
+                      setEditedPlan({ ...editedPlan, schedule: updatedSchedule });
+                    }}
+                  >
+                    <option value="Rest">Rest Day</option>
+                    {editedPlan.days.map(d => (
+                      <option key={d.shortName} value={d.shortName}>{d.name} ({d.shortName})</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Workout Days List */}
+          <section className="mb-section">
+            <h3 className="text-h3" style={{ fontSize: 16, marginBottom: 12 }}>Workout Days & Exercises</h3>
+            <div className="flex-col gap-md">
+              {editedPlan.days.map((day, dayIdx) => (
+                <div key={dayIdx} className="card" style={{ padding: 18, border: '1px solid var(--border-subtle)' }}>
+                  
+                  {/* Day header */}
+                  <div className="flex-row justify-between align-center" style={{ marginBottom: 14, gap: 10 }}>
+                    <div className="flex-col flex-1">
+                      <input type="text" className="input" style={{ padding: '6px 10px', fontSize: 15, fontWeight: 700, border: 'none', background: 'transparent', borderBottom: '1px dashed var(--border-strong)', borderRadius: 0 }}
+                        placeholder="Day Title" value={day.name} onChange={e => handleUpdateDayName(dayIdx, e.target.value)} />
+                    </div>
+                    <div style={{ width: 70 }}>
+                      <input type="text" className="input" style={{ padding: '6px 8px', fontSize: 12, fontWeight: 700, textAlign: 'center', textTransform: 'uppercase' }}
+                        placeholder="Abbr" value={day.shortName} onChange={e => handleUpdateDayShortName(dayIdx, e.target.value)} />
+                    </div>
+                    <button className="btn-icon text-red" style={{ width: 32, height: 32, backgroundColor: 'transparent' }}
+                      onClick={() => handleDeleteDay(dayIdx)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  {/* Exercises list */}
+                  <div className="flex-col" style={{ marginBottom: 12 }}>
+                    {day.exercises.length === 0 ? (
+                      <span className="text-caption" style={{ textAlign: 'center', padding: '12px 0', display: 'block' }}>No exercises added yet</span>
+                    ) : (
+                      <>
+                        {/* Header Row */}
+                        <div className="flex-row" style={{ paddingBottom: 6, borderBottom: '1px solid var(--divider)' }}>
+                          <span className="text-caption" style={{ flex: 1, fontSize: 10 }}>Exercise</span>
+                          <span className="text-caption" style={{ width: 44, textAlign: 'center', fontSize: 10 }}>Sets</span>
+                          <span className="text-caption" style={{ width: 50, textAlign: 'center', fontSize: 10 }}>Reps</span>
+                          <span className="text-caption" style={{ width: 50, textAlign: 'center', fontSize: 10 }}>KG</span>
+                          <span className="text-caption" style={{ width: 28, fontSize: 10 }} />
+                        </div>
+                        {/* Exercise Rows */}
+                        {day.exercises.map((ex, exIdx) => {
+                          const info = getExercise(ex.exerciseId);
+                          return (
+                            <div key={exIdx} className="flex-row align-center" style={{ padding: '8px 0', borderBottom: '1px solid var(--divider)', gap: 6 }}>
+                              <span className="text-body" style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+                                {info?.name || ex.exerciseId}
+                              </span>
+                              
+                              <input type="number" className="set-input" style={{ width: 44, padding: '4px 6px', fontSize: 12 }}
+                                value={ex.sets} onChange={e => handleUpdateExercise(dayIdx, exIdx, 'sets', parseInt(e.target.value) || 0)} />
+                              
+                              <input type="text" className="set-input" style={{ width: 50, padding: '4px 6px', fontSize: 12 }}
+                                value={ex.reps} onChange={e => handleUpdateExercise(dayIdx, exIdx, 'reps', e.target.value)} />
+                              
+                              <input type="number" className="set-input" style={{ width: 50, padding: '4px 6px', fontSize: 12 }}
+                                value={ex.weight} onChange={e => handleUpdateExercise(dayIdx, exIdx, 'weight', parseFloat(e.target.value) || 0)} />
+                              
+                              <button className="btn-icon" style={{ width: 24, height: 24, backgroundColor: 'transparent', color: 'var(--text-tertiary)' }}
+                                onClick={() => handleDeleteExercise(dayIdx, exIdx)}>
+                                <X size={14} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Add Exercise UI */}
+                  {addingExerciseToDayIdx === dayIdx ? (
+                    <div className="card flex-col gap-sm" style={{ padding: 12, background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-strong)', marginTop: 8 }}>
+                      <div className="flex-row gap-xs">
+                        <input type="text" className="input" style={{ padding: '8px 12px', fontSize: 14 }}
+                          placeholder="Search or enter custom..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                        <button className="btn btn-secondary btn-sm" style={{ padding: '0 12px', height: 38 }} onClick={() => { setAddingExerciseToDayIdx(null); setSearchQuery(''); }}>Cancel</button>
+                      </div>
+                      
+                      <div style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+                        {filteredExercises.slice(0, 15).map(ex => (
+                          <button key={ex.id} className="search-item" style={{ borderBottom: '1px solid var(--divider)', padding: '10px 8px', width: '100%', textAlign: 'left', background: 'none', color: 'var(--text-primary)', outline: 'none' }}
+                            onClick={() => handleAddExercise(dayIdx, ex.id)}>
+                            <div className="flex-col">
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>{ex.name}</span>
+                              <span className="text-caption" style={{ fontSize: 10 }}>{ex.muscle} • {ex.equipment}</span>
+                            </div>
+                            <Plus size={14} className="text-secondary" />
+                          </button>
+                        ))}
+                        {searchQuery.trim() && !EXERCISE_DB.some(e => e.name.toLowerCase() === searchQuery.toLowerCase()) && (
+                          <button className="btn btn-secondary btn-sm" style={{ marginTop: 6, justifyContent: 'flex-start', padding: 10, borderRadius: 8, fontSize: 13 }}
+                            onClick={() => handleAddCustomExercise(dayIdx)}>
+                            ➕ Add Custom Exercise "{searchQuery}"
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="btn btn-secondary btn-sm" style={{ width: '100%', gap: 6, borderRadius: 10, padding: 10, fontSize: 13 }}
+                      onClick={() => setAddingExerciseToDayIdx(dayIdx)}>
+                      <Plus size={14} /> Add Exercise
+                    </button>
+                  )}
+
+                </div>
+              ))}
+              
+              <button className="btn btn-secondary" style={{ width: '100%', gap: 8, borderStyle: 'dashed', background: 'transparent' }}
+                onClick={handleAddDay}>
+                <Plus size={16} /> Add Workout Day
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

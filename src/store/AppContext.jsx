@@ -2,87 +2,76 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { WORKOUT_TEMPLATES, getExercise } from '../data/presets';
 import { supabase } from '../supabaseClient';
+import { load, save, loadLegacy, clearAscendLocalCache } from '../utils/storage';
+
+export { clearAscendLocalCache };
 
 const AppContext = createContext();
 const getToday = () => new Date().toISOString().split('T')[0];
 let _id = Date.now();
 const uid = () => (_id++).toString(36);
 
-function load(key, def) {
-  try { const v = localStorage.getItem(`ascend_${key}`); return v ? JSON.parse(v) : def; }
-  catch { return def; }
-}
-function save(key, val) { localStorage.setItem(`ascend_${key}`, JSON.stringify(val)); }
-
 export function AppProvider({ children, session }) {
+  const userId = session?.user?.id;
   const [dbLoading, setDbLoading] = useState(true);
+  const [syncError, setSyncError] = useState(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [theme, setTheme] = useState(() => load('theme', 'dark'));
-  const [units, setUnits] = useState(() => load('units', { weight: 'kg', distance: 'km' }));
-  const [goals, setGoals] = useState(() => load('goals', { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 }));
-  const [profile, setProfile] = useState(() => load('profile', { name: 'User', age: 25, height: 175, gender: 'Other' }));
-  const [notifications, setNotifications] = useState(() => load('notifications', { workout: true, meals: true, water: true, steps: true }));
+  const [theme, setTheme] = useState(() => load('theme', 'dark', userId));
+  const [units, setUnits] = useState(() => load('units', { weight: 'kg', distance: 'km' }, userId));
+  const [goals, setGoals] = useState(() => load('goals', { calories: 2400, protein: 160, carbs: 250, fats: 70, water: 3.0, steps: 10000 }, userId));
+  const [profile, setProfile] = useState(() => load('profile', { name: 'User', age: 25, height: 175, gender: 'Other' }, userId));
+  const [notifications, setNotifications] = useState(() => load('notifications', { workout: true, meals: true, water: true, steps: true }, userId));
 
   useEffect(() => {
-    if (!dbLoading) {
-      save('theme', theme);
-      if (session?.user?.id) {
-        supabase.from('profiles').upsert({ id: session.user.id, theme }).then(({ error }) => {
-          if (error) console.error('Error saving theme:', error);
-        });
-      }
+    if (!dbLoading && userId) {
+      save('theme', theme, userId);
+      supabase.from('profiles').upsert({ id: userId, theme }).then(({ error }) => {
+        if (error) console.error('Error saving theme:', error);
+      });
     }
-  }, [theme, dbLoading, session]);
+  }, [theme, dbLoading, userId]);
 
   useEffect(() => {
-    if (!dbLoading) {
-      save('units', units);
-      if (session?.user?.id) {
-        supabase.from('profiles').upsert({ id: session.user.id, units }).then(({ error }) => {
-          if (error) console.error('Error saving units:', error);
-        });
-      }
+    if (!dbLoading && userId) {
+      save('units', units, userId);
+      supabase.from('profiles').upsert({ id: userId, units }).then(({ error }) => {
+        if (error) console.error('Error saving units:', error);
+      });
     }
-  }, [units, dbLoading, session]);
+  }, [units, dbLoading, userId]);
 
   useEffect(() => {
-    if (!dbLoading) {
-      save('goals', goals);
-      if (session?.user?.id) {
-        supabase.from('profiles').upsert({ id: session.user.id, goals }).then(({ error }) => {
-          if (error) console.error('Error saving goals:', error);
-        });
-      }
+    if (!dbLoading && userId) {
+      save('goals', goals, userId);
+      supabase.from('profiles').upsert({ id: userId, goals }).then(({ error }) => {
+        if (error) console.error('Error saving goals:', error);
+      });
     }
-  }, [goals, dbLoading, session]);
+  }, [goals, dbLoading, userId]);
 
   useEffect(() => {
-    if (!dbLoading) {
-      save('profile', profile);
-      if (session?.user?.id) {
-        supabase.from('profiles').upsert({
-          id: session.user.id,
-          name: profile.name,
-          age: profile.age,
-          height: profile.height,
-          gender: profile.gender
-        }).then(({ error }) => {
-          if (error) console.error('Error saving profile:', error);
-        });
-      }
+    if (!dbLoading && userId) {
+      save('profile', profile, userId);
+      supabase.from('profiles').upsert({
+        id: userId,
+        name: profile.name,
+        age: profile.age,
+        height: profile.height,
+        gender: profile.gender
+      }).then(({ error }) => {
+        if (error) console.error('Error saving profile:', error);
+      });
     }
-  }, [profile, dbLoading, session]);
+  }, [profile, dbLoading, userId]);
 
   useEffect(() => {
-    if (!dbLoading) {
-      save('notifications', notifications);
-      if (session?.user?.id) {
-        supabase.from('profiles').upsert({ id: session.user.id, notifications }).then(({ error }) => {
-          if (error) console.error('Error saving notifications:', error);
-        });
-      }
+    if (!dbLoading && userId) {
+      save('notifications', notifications, userId);
+      supabase.from('profiles').upsert({ id: userId, notifications }).then(({ error }) => {
+        if (error) console.error('Error saving notifications:', error);
+      });
     }
-  }, [notifications, dbLoading, session]);
+  }, [notifications, dbLoading, userId]);
 
 
 
@@ -102,11 +91,18 @@ export function AppProvider({ children, session }) {
   const [selectedDate, setSelectedDate] = useState(() => getToday());
 
   // ── Active Workout Plan ──
-  const [activePlanId, setActivePlanId] = useState(() => load('activePlanId', 'ppl'));
-  const [customPlans, setCustomPlans] = useState(() => load('customPlans', []));
+  const [activePlanId, setActivePlanId] = useState(() => load('activePlanId', 'ppl', userId));
+  const [customPlans, setCustomPlans] = useState(() => load('customPlans', [], userId));
 
-  useEffect(() => { if (!dbLoading) save('activePlanId', activePlanId); }, [activePlanId, dbLoading]);
-  useEffect(() => { if (!dbLoading) save('customPlans', customPlans); }, [customPlans, dbLoading]);
+  useEffect(() => {
+    if (!dbLoading && userId) {
+      save('activePlanId', activePlanId, userId);
+      supabase.from('profiles').upsert({ id: userId, active_plan_id: activePlanId }).then(({ error }) => {
+        if (error) console.error('Error saving active plan:', error);
+      });
+    }
+  }, [activePlanId, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('customPlans', customPlans, userId); }, [customPlans, dbLoading, userId]);
 
   const allPlans = useMemo(() => [...WORKOUT_TEMPLATES, ...customPlans], [customPlans]);
   const activePlan = useMemo(() => allPlans.find(p => p.id === activePlanId) || allPlans[0], [allPlans, activePlanId]);
@@ -126,6 +122,7 @@ export function AppProvider({ children, session }) {
         days: plan.days
       });
     }
+    return newId;
   }, [session]);
 
   const editCustomPlan = useCallback(async (id, updates) => {
@@ -184,9 +181,9 @@ export function AppProvider({ children, session }) {
   }, [activePlan, todayScheduleLabel]);
 
   // ── Active Workout Session ──
-  const [activeSession, setActiveSession] = useState(() => load('activeSession', null));
+  const [activeSession, setActiveSession] = useState(() => load('activeSession', null, userId));
   const [restTimer, setRestTimer] = useState(() => {
-    const saved = load('restTimer', { active: false, remaining: 0, duration: 90, endTime: null });
+    const saved = load('restTimer', { active: false, remaining: 0, duration: 90, endTime: null }, userId);
     if (saved.active && saved.endTime) {
       const rem = Math.ceil((saved.endTime - Date.now()) / 1000);
       if (rem > 0) return { ...saved, remaining: rem };
@@ -195,8 +192,8 @@ export function AppProvider({ children, session }) {
     return saved;
   });
 
-  useEffect(() => save('activeSession', activeSession), [activeSession]);
-  useEffect(() => save('restTimer', restTimer), [restTimer]);
+  useEffect(() => { if (!dbLoading && userId) save('activeSession', activeSession, userId); }, [activeSession, dbLoading, userId]);
+  useEffect(() => { if (userId) save('restTimer', restTimer, userId); }, [restTimer, userId]);
 
   const startWorkoutSession = useCallback((dayData) => {
     const exercises = dayData.exercises.map(ex => ({
@@ -277,11 +274,11 @@ export function AppProvider({ children, session }) {
   }, [restTimer.active, restTimer.remaining]);
 
   // ── Workout History ──
-  const [workoutHistory, setWorkoutHistory] = useState(() => load('workoutHistory', []));
-  const [personalRecords, setPersonalRecords] = useState(() => load('prs', {}));
+  const [workoutHistory, setWorkoutHistory] = useState(() => load('workoutHistory', [], userId));
+  const [personalRecords, setPersonalRecords] = useState(() => load('prs', {}, userId));
 
-  useEffect(() => { if (!dbLoading) save('workoutHistory', workoutHistory); }, [workoutHistory, dbLoading]);
-  useEffect(() => { if (!dbLoading) save('prs', personalRecords); }, [personalRecords, dbLoading]);
+  useEffect(() => { if (!dbLoading && userId) save('workoutHistory', workoutHistory, userId); }, [workoutHistory, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('prs', personalRecords, userId); }, [personalRecords, dbLoading, userId]);
 
   const finishWorkout = useCallback(async () => {
     if (!activeSession) return;
@@ -334,11 +331,11 @@ export function AppProvider({ children, session }) {
   const cancelWorkout = useCallback(() => { setActiveSession(null); cancelRestTimer(); }, [cancelRestTimer]);
 
   // ── Meals / Nutrition ──
-  const [mealsByDate, setMealsByDate] = useState(() => load('meals', {}));
-  const [favoriteFoods, setFavoriteFoods] = useState(() => load('favFoods', []));
+  const [mealsByDate, setMealsByDate] = useState(() => load('meals', {}, userId));
+  const [favoriteFoods, setFavoriteFoods] = useState(() => load('favFoods', [], userId));
 
-  useEffect(() => { if (!dbLoading) save('meals', mealsByDate); }, [mealsByDate, dbLoading]);
-  useEffect(() => { if (!dbLoading) save('favFoods', favoriteFoods); }, [favoriteFoods, dbLoading]);
+  useEffect(() => { if (!dbLoading && userId) save('meals', mealsByDate, userId); }, [mealsByDate, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('favFoods', favoriteFoods, userId); }, [favoriteFoods, dbLoading, userId]);
 
   const todayMeals = useMemo(() => mealsByDate[selectedDate] || [], [mealsByDate, selectedDate]);
 
@@ -356,6 +353,8 @@ export function AppProvider({ children, session }) {
         user_id: session.user.id,
         date: today,
         name: meal.name,
+        meal_type: meal.mealType || 'Snack',
+        food_id: meal.foodId || null,
         calories: meal.calories,
         protein: meal.protein,
         carbs: meal.carbs,
@@ -390,6 +389,8 @@ export function AppProvider({ children, session }) {
           user_id: session.user.id,
           date: today,
           name: merged.name,
+          meal_type: merged.mealType || 'Snack',
+          food_id: merged.foodId || null,
           calories: merged.calories,
           protein: merged.protein,
           carbs: merged.carbs,
@@ -432,10 +433,10 @@ export function AppProvider({ children, session }) {
   }, [todayMeals]);
 
   // ── Water ──
-  const [waterByDate, setWaterByDate] = useState(() => load('water', {}));
+  const [waterByDate, setWaterByDate] = useState(() => load('water', {}, userId));
   const todayWater = useMemo(() => waterByDate[selectedDate] || 0, [waterByDate, selectedDate]);
   
-  useEffect(() => { if (!dbLoading) save('water', waterByDate); }, [waterByDate, dbLoading]);
+  useEffect(() => { if (!dbLoading && userId) save('water', waterByDate, userId); }, [waterByDate, dbLoading, userId]);
 
   const upsertDailyMetric = useCallback(async (date, updates) => {
     if (!session?.user?.id) return;
@@ -465,10 +466,10 @@ export function AppProvider({ children, session }) {
   }, [session, waterByDate, upsertDailyMetric, selectedDate]);
 
   // ── Bodyweight ──
-  const [bodyweightLog, setBodyweightLog] = useState(() => load('bodyweight', []));
-  const currentWeight = bodyweightLog[bodyweightLog.length - 1]?.weight || 78;
+  const [bodyweightLog, setBodyweightLog] = useState(() => load('bodyweight', [], userId));
+  const currentWeight = bodyweightLog[bodyweightLog.length - 1]?.weight ?? null;
 
-  useEffect(() => { if (!dbLoading) save('bodyweight', bodyweightLog); }, [bodyweightLog, dbLoading]);
+  useEffect(() => { if (!dbLoading && userId) save('bodyweight', bodyweightLog, userId); }, [bodyweightLog, dbLoading, userId]);
 
   const addBodyweight = useCallback(async (weight) => {
     const today = selectedDate;
@@ -482,10 +483,10 @@ export function AppProvider({ children, session }) {
   }, [session, upsertDailyMetric, selectedDate]);
 
   // ── Steps ──
-  const [stepsByDate, setStepsByDate] = useState(() => load('steps', {}));
+  const [stepsByDate, setStepsByDate] = useState(() => load('steps', {}, userId));
   const todaySteps = useMemo(() => stepsByDate[selectedDate] || 0, [stepsByDate, selectedDate]);
 
-  useEffect(() => { if (!dbLoading) save('steps', stepsByDate); }, [stepsByDate, dbLoading]);
+  useEffect(() => { if (!dbLoading && userId) save('steps', stepsByDate, userId); }, [stepsByDate, dbLoading, userId]);
 
   const addSteps = useCallback(async (count) => {
     const today = selectedDate;
@@ -497,11 +498,11 @@ export function AppProvider({ children, session }) {
   }, [session, stepsByDate, upsertDailyMetric, selectedDate]);
 
   // ── Activities ──
-  const [activities, setActivities] = useState(() => load('activities', []));
-  const [liveActivity, setLiveActivity] = useState(() => load('liveActivity', null));
+  const [activities, setActivities] = useState(() => load('activities', [], userId));
+  const [liveActivity, setLiveActivity] = useState(() => load('liveActivity', null, userId));
 
-  useEffect(() => { if (!dbLoading) save('activities', activities); }, [activities, dbLoading]);
-  useEffect(() => { if (!dbLoading) save('liveActivity', liveActivity); }, [liveActivity, dbLoading]);
+  useEffect(() => { if (!dbLoading && userId) save('activities', activities, userId); }, [activities, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('liveActivity', liveActivity, userId); }, [liveActivity, dbLoading, userId]);
 
   const startLiveActivity = useCallback((type) => {
     setLiveActivity({ type, label: type === 'run' ? 'Running' : type === 'walk' ? 'Walking' : 'Cycling', startTime: Date.now(), distance: 0, elapsed: 0 });
@@ -516,10 +517,10 @@ export function AppProvider({ children, session }) {
     const paceSec = Math.round((dur / (dist || 1)) % 60);
     const cal = Math.round(dist * (liveActivity.type === 'run' ? 80 : liveActivity.type === 'walk' ? 55 : 45));
     const newId = uid();
-    const today = getToday();
+    const activityDate = selectedDate;
     const entry = {
       id: newId, type: liveActivity.type, label: liveActivity.label,
-      date: today, distance: parseFloat(dist.toFixed(1)),
+      date: activityDate, distance: parseFloat(dist.toFixed(1)),
       duration: dur, pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`, calories: cal,
     };
     setActivities(prev => [entry, ...prev]);
@@ -531,14 +532,14 @@ export function AppProvider({ children, session }) {
         user_id: session.user.id,
         type: liveActivity.type,
         label: liveActivity.label,
-        date: today,
+        date: activityDate,
         distance: parseFloat(dist.toFixed(1)),
         duration: dur,
         pace: `${paceMin}:${String(paceSec).padStart(2, '0')}`,
         calories: cal
       });
     }
-  }, [liveActivity, session]);
+  }, [liveActivity, session, selectedDate]);
 
   const cancelLiveActivity = useCallback(() => { setLiveActivity(null); }, []);
 
@@ -554,7 +555,7 @@ export function AppProvider({ children, session }) {
       else if (i > 0) break;
       d.setDate(d.getDate() - 1);
     }
-    return count || 14; // fallback for demo
+    return count;
   }, [workoutHistory]);
 
   // ── Week Stats ──
@@ -569,6 +570,74 @@ export function AppProvider({ children, session }) {
       count: weekActivities.length,
     };
   }, [activities]);
+
+  const migrateLegacyLocalDataToCloud = useCallback(async (uid) => {
+    const { count: historyCount } = await supabase
+      .from('workout_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', uid);
+    const localHistory = loadLegacy('workoutHistory', []);
+    if (localHistory.length > 0 && !historyCount) {
+      for (const w of localHistory) {
+        await supabase.from('workout_history').insert({
+          id: w.id || uid(),
+          user_id: uid,
+          plan_name: w.planName,
+          date: w.date,
+          duration: w.duration,
+          exercises: w.exercises,
+          total_volume: w.totalVolume
+        });
+      }
+    }
+
+    const { count: mealsCount } = await supabase
+      .from('meals')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', uid);
+    const localMeals = loadLegacy('meals', {});
+    const flatMeals = Object.entries(localMeals).flatMap(([date, items]) =>
+      (items || []).map((m) => ({ ...m, date }))
+    );
+    if (flatMeals.length > 0 && !mealsCount) {
+      for (const m of flatMeals) {
+        await supabase.from('meals').insert({
+          id: m.id || uid(),
+          user_id: uid,
+          date: m.date,
+          name: m.name,
+          meal_type: m.mealType || 'Snack',
+          food_id: m.foodId || null,
+          calories: m.calories,
+          protein: m.protein,
+          carbs: m.carbs,
+          fats: m.fats,
+          qty: m.qty || 1
+        });
+      }
+    }
+
+    const { count: actCount } = await supabase
+      .from('activities')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', uid);
+    const localActivities = loadLegacy('activities', []);
+    if (localActivities.length > 0 && !actCount) {
+      for (const a of localActivities) {
+        await supabase.from('activities').insert({
+          id: a.id || uid(),
+          user_id: uid,
+          type: a.type,
+          label: a.label,
+          date: a.date,
+          distance: a.distance,
+          duration: a.duration,
+          pace: a.pace,
+          calories: a.calories
+        });
+      }
+    }
+  }, []);
 
   const completeOnboarding = useCallback(async (data) => {
     setDbLoading(true);
@@ -634,7 +703,8 @@ export function AppProvider({ children, session }) {
         theme,
         units: data.units,
         goals: computedGoals,
-        notifications
+        notifications,
+        active_plan_id: activePlanId || 'ppl'
       };
       
       const { error: insertError } = await supabase
@@ -662,14 +732,21 @@ export function AppProvider({ children, session }) {
       setGoals(computedGoals);
       setUnits(data.units);
       setBodyweightLog([{ date: todayDate, weight: parseFloat(data.weight) }]);
+      await migrateLegacyLocalDataToCloud(session.user.id);
       setNeedsOnboarding(false);
+      setSyncError(null);
     } catch (err) {
       console.error('Error completing onboarding:', err);
       alert(err.message || 'Error saving onboarding data');
     } finally {
       setDbLoading(false);
     }
-  }, [session, theme, notifications]);
+  }, [session, theme, notifications, activePlanId, migrateLegacyLocalDataToCloud]);
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const retrySync = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  const waterUnit = units.weight === 'lb' ? 'oz' : 'L';
 
   useEffect(() => {
     async function loadUserData() {
@@ -679,6 +756,7 @@ export function AppProvider({ children, session }) {
       }
       try {
         setDbLoading(true);
+        setSyncError(null);
         // 1. Load Profile
         let { data: profileData, error: profileError } = await supabase
           .from('profiles')
@@ -702,6 +780,9 @@ export function AppProvider({ children, session }) {
             gender: profileData.gender || 'Other'
           });
           setNotifications(profileData.notifications || { workout: true, meals: true, water: true, steps: true });
+          if (profileData.active_plan_id) setActivePlanId(profileData.active_plan_id);
+
+          await migrateLegacyLocalDataToCloud(session.user.id);
 
           // 2. Load Custom Plans
           const { data: plansData, error: plansError } = await supabase
@@ -764,6 +845,8 @@ export function AppProvider({ children, session }) {
               acc[d].push({
                 id: m.id,
                 name: m.name,
+                mealType: m.meal_type || 'Snack',
+                foodId: m.food_id || null,
                 calories: m.calories,
                 protein: m.protein,
                 carbs: m.carbs,
@@ -841,12 +924,13 @@ export function AppProvider({ children, session }) {
         }
       } catch (err) {
         console.error('Error loading Supabase user data:', err);
+        setSyncError(err.message || 'Could not load your data from the cloud. Check your connection and try again.');
       } finally {
         setDbLoading(false);
       }
     }
     loadUserData();
-  }, [session]);
+  }, [session, reloadKey, migrateLegacyLocalDataToCloud]);
 
   const value = {
     theme, setTheme, resolvedTheme,
@@ -864,7 +948,7 @@ export function AppProvider({ children, session }) {
     activities, liveActivity, startLiveActivity, stopLiveActivity, cancelLiveActivity, weekActivityStats,
     streak,
     needsOnboarding, completeOnboarding,
-    selectedDate, setSelectedDate, dbLoading
+    selectedDate, setSelectedDate, dbLoading, syncError, retrySync, waterUnit
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -56,6 +56,8 @@ create table public.meals (
   user_id uuid references auth.users(id) not null,
   date date not null,
   name text not null,
+  meal_type text default 'Snack',
+  food_id text,
   calories numeric,
   protein numeric,
   carbs numeric,

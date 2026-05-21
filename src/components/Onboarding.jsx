@@ -572,7 +572,7 @@ export default function Onboarding() {
                   alignItems: 'center',
                   gap: '12px'
                 }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(50, 215, 75, 0.12)', display: 'flex', alignItems: 'center', justifyCenter: 'center', color: 'var(--accent-green)', flexShrink: 0, justifyContent: 'center' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(50, 215, 75, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-green)', flexShrink: 0 }}>
                     <Flame size={18} />
                   </div>
                   <div>

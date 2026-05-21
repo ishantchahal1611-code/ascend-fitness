@@ -6,7 +6,7 @@ import { useApp } from '../store/AppContext';
 import { getExercise } from '../data/presets';
 
 function LogWeightModal({ currentWeight, unit, onSave, onClose }) {
-  const [val, setVal] = useState(currentWeight);
+  const [val, setVal] = useState(currentWeight ?? (unit === 'lb' ? 170 : 75));
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
@@ -81,7 +81,7 @@ export default function ProgressSystem() {
             <div className="flex-col">
               <span className="text-caption" style={{ color: 'var(--accent-blue)' }}>Bodyweight</span>
               <div className="flex-row align-center gap-sm" style={{ marginTop: 4 }}>
-                <span className="text-h2">{latestWeight} <span className="text-body">{weightUnit}</span></span>
+                <span className="text-h2">{latestWeight > 0 ? latestWeight : '—'} <span className="text-body">{weightUnit}</span></span>
               </div>
             </div>
             <div className="flex-row gap-sm">
@@ -146,7 +146,7 @@ export default function ProgressSystem() {
           <div className="card flex-1 flex-col justify-between" style={{ padding: 24 }}>
             <div className="flex-col">
               <span className="text-caption text-orange">Best Streak</span>
-              <span className="text-h2" style={{ marginTop: 4 }}>{Math.max(streak, 28)} Days</span>
+              <span className="text-h2" style={{ marginTop: 4 }}>{streak} Days</span>
             </div>
             <div className="flex-col" style={{ marginTop: 16 }}>
               <span className="text-caption text-red">Current</span>

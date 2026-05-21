@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './store/AppContext';
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 import Auth from './components/Auth';
 import HomeDashboard from './components/HomeDashboard';
 import WorkoutPlanner from './components/WorkoutPlanner';
@@ -13,10 +13,28 @@ import Onboarding from './components/Onboarding';
 
 function AppContent({ session }) {
   const [activeTab, setActiveTab] = useState('home');
-  const { restTimer, cancelRestTimer, needsOnboarding } = useApp();
+  const { restTimer, cancelRestTimer, needsOnboarding, dbLoading, syncError, retrySync } = useApp();
 
   if (needsOnboarding) {
     return <Onboarding />;
+  }
+
+  if (dbLoading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        Syncing your data...
+      </div>
+    );
+  }
+
+  if (syncError) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg-primary)', color: 'var(--text-primary)', textAlign: 'center', gap: 16 }}>
+        <p style={{ fontSize: 18, fontWeight: 600 }}>Could not load your data</p>
+        <p style={{ color: 'var(--text-secondary)', maxWidth: 320 }}>{syncError}</p>
+        <button className="btn btn-primary" onClick={retrySync}>Try again</button>
+      </div>
+    );
   }
 
   const renderTab = () => {
@@ -69,6 +87,17 @@ function App() {
 
   if (loading) {
     return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>Loading Ascend Fitness...</div>;
+  }
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg-primary)', color: 'var(--text-primary)', textAlign: 'center', gap: 12 }}>
+        <p style={{ fontSize: 20, fontWeight: 700 }}>Setup required</p>
+        <p style={{ color: 'var(--text-secondary)', maxWidth: 360 }}>
+          Copy <code>.env.example</code> to <code>.env</code> and add your Supabase project URL and anon key, then restart the app.
+        </p>
+      </div>
+    );
   }
 
   if (!session) {

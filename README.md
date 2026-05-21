@@ -10,7 +10,7 @@ Ascend Fitness is a modern, high-performance, and visually stunning web applicat
 - **🏋️ Workout Planner:** Log workouts, manage custom routines (Push/Pull/Legs templates or custom created routines), duplicate plans, track sets, and record Personal Records (PRs) seamlessly.
 - **🍎 Nutrition & Calorie Tracker:** Log custom meals, save favorite items to a persistent food list, track macro goals, and monitor total water intake.
 - **🏃 Live Activity Tracker:** Capture live running, walking, or cycling sessions with real-time pace, distance, and calorie expenditure metrics.
-- **☁️ Cloud Sync & Migration:** Powered by Supabase for user authentication and relational database storage. Includes automatic offline-to-online migration of local session data upon first registration.
+- **☁️ Cloud Sync:** Powered by Supabase for user authentication and relational database storage. Browser cache is scoped per account; legacy local data uploads to the cloud when your account has no cloud history yet.
 
 ---
 
@@ -39,13 +39,20 @@ npm install
 ### 3. Database Setup (Supabase)
 1. Create a new project on the [Supabase Dashboard](https://supabase.com).
 2. Open the **SQL Editor** in your Supabase project.
-3. Copy and run the contents of [`supabase_schema.sql`](file:///c:/Antigravity%20workspace/supabase_schema.sql) to initialize the database tables, relations, and permissions.
+3. Copy and run the contents of [`supabase_schema.sql`](supabase_schema.sql) to initialize the database tables, relations, and permissions.
+4. If you already created tables earlier, also run [`supabase_migrations/001_meal_type_and_active_plan.sql`](supabase_migrations/001_meal_type_and_active_plan.sql) in the SQL Editor.
 
 ### 4. Environment Configuration
 Create a `.env` file in the root directory:
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Optional for deployment path:
+
+```env
+VITE_BASE_PATH=/ascend-fitness/
 ```
 
 ### 5. Running Locally

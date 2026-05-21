@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import { Flame, Droplets, Activity, Plus, Minus, RefreshCw, Dumbbell, Clock, Apple } from 'lucide-react';
+import { Flame, Droplets, Activity, Plus, Minus, RefreshCw, Dumbbell, Clock, Apple, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../store/AppContext';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function HomeDashboard({ onNavigate }) {
   const {
-    todayTotals, goals, todayWater, addWater, todaySteps, addSteps,
+    todayTotals, goals, todayWater, addWater, todaySteps, addSteps, waterUnit,
     streak, todayWorkout, todayScheduleLabel, activePlan,
     startWorkoutSession,
     selectedDate, setSelectedDate, dbLoading, workoutHistory, mealsByDate
@@ -20,10 +20,16 @@ export default function HomeDashboard({ onNavigate }) {
   }, [workoutHistory, selectedDate]);
 
   const weekDays = useMemo(() => {
-    const todayDateObj = new Date();
-    const todayDay = todayDateObj.getDay(); // Sun=0 .. Sat=6
-    const sundayDate = new Date(todayDateObj);
-    sundayDate.setDate(todayDateObj.getDate() - todayDay);
+    const parts = selectedDate.split('-');
+    let refDate;
+    if (parts.length === 3) {
+      refDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      refDate = new Date();
+    }
+    const dayOfWeek = refDate.getDay(); // Sun=0 .. Sat=6
+    const sundayDate = new Date(refDate);
+    sundayDate.setDate(refDate.getDate() - dayOfWeek);
 
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(sundayDate);
@@ -73,8 +79,27 @@ export default function HomeDashboard({ onNavigate }) {
     completed: item.hasWorkout
   }));
 
+  const changeWeek = (offset) => {
+    const parts = selectedDate.split('-');
+    let d;
+    if (parts.length === 3) {
+      d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      d = new Date();
+    }
+    d.setDate(d.getDate() + offset);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const dateNum = String(d.getDate()).padStart(2, '0');
+    setSelectedDate(`${year}-${month}-${dateNum}`);
+  };
+
+  const goToPrevWeek = () => changeWeek(-7);
+  const goToNextWeek = () => changeWeek(7);
+  const goToToday = () => setSelectedDate(getToday());
+
   // Show skeleton screen if data is loading and cache is completely empty
-  const showSkeleton = dbLoading && (workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0 && !localStorage.getItem('ascend_profile'));
+  const showSkeleton = dbLoading && workoutHistory.length === 0 && Object.keys(mealsByDate).length === 0;
 
   if (showSkeleton) {
     return (
@@ -114,7 +139,7 @@ export default function HomeDashboard({ onNavigate }) {
       <header className="flex-row justify-between align-center mb-section" style={{ marginTop: 20, marginBottom: 20 }}>
         <div className="flex-row align-center gap-sm" onClick={() => onNavigate('settings')} style={{ cursor: 'pointer' }}>
           <Apple size={28} style={{ color: 'var(--text-primary)' }} fill="currentColor" />
-          <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>Ascend AI</span>
+          <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>Ascend</span>
           {dbLoading && <RefreshCw size={14} className="text-tertiary animate-spin" style={{ marginLeft: 4 }} />}
         </div>
         <div className="flex-row align-center gap-xs" style={{
@@ -132,53 +157,34 @@ export default function HomeDashboard({ onNavigate }) {
 
       {/* Week Dates Selector */}
       <section className="mb-section" style={{ marginTop: -12, marginBottom: 24 }}>
-        <div className="text-label" style={{ fontSize: 13, marginBottom: 16, fontWeight: 600, color: 'var(--text-secondary)' }}>{dateStr}</div>
-        <div className="flex-row justify-between" style={{ margin: '0 -8px', padding: '0 8px', overflowX: 'auto', gap: 6 }}>
-          {weekDays.map((item, i) => {
-            const circleStyle = item.active ? {
-              border: '2.5px solid var(--text-primary)',
-              background: 'var(--bg-surface-elevated)'
-            } : item.isToday ? {
-              border: '2px solid var(--text-secondary)',
-              background: 'var(--bg-surface)'
-            } : item.hasWorkout ? {
-              border: '2px solid var(--accent-red)',
-              background: 'var(--bg-surface)'
-            } : item.hasMeals ? {
-              border: '2px solid var(--accent-green)',
-              background: 'var(--bg-surface)'
-            } : {
-              border: '1.5px dashed var(--border-subtle)',
-              background: 'transparent',
-              opacity: 0.5
-            };
-            return (
-              <button key={i}
-                onClick={() => setSelectedDate(item.dateStr)}
-                style={{
-                  background: 'none', border: 'none', padding: 0, outline: 'none', cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 1, minWidth: 38
-                }}
-              >
-                <span className="text-caption" style={{ 
-                  fontSize: 11, 
-                  fontWeight: item.active ? '700' : '500',
-                  color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)'
-                }}>
-                  {item.day}
-                </span>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700,
-                  color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  ...circleStyle
-                }}>
-                  {item.dateNum}
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex-row justify-between align-center" style={{ marginBottom: 16 }}>
+          <div className="text-label" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>{dateStr}</div>
+          <div className="flex-row gap-xs">
+            <button className="btn-icon" onClick={goToPrevWeek} style={{ width: 28, height: 28, borderRadius: 6 }}><ChevronLeft size={16} /></button>
+            <button className="btn btn-secondary btn-sm" onClick={goToToday} style={{ padding: '2px 10px', fontSize: 11, height: 28, borderRadius: 6 }}>Today</button>
+            <button className="btn-icon" onClick={goToNextWeek} style={{ width: 28, height: 28, borderRadius: 6 }}><ChevronRight size={16} /></button>
+          </div>
+        </div>
+        <div className="flex-row" style={{ overflowX: 'auto', gap: 12, paddingBottom: 8, margin: '0 -24px', padding: '0 24px 8px' }}>
+          {weekDays.map((item, i) => (
+            <button key={i} className={`card ${item.active ? 'card-elevated' : ''}`}
+              onClick={() => setSelectedDate(item.dateStr)}
+              style={{
+                minWidth: 54, padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                border: item.active ? '1.5px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                background: item.active ? 'var(--bg-surface-elevated)' : 'var(--bg-surface)',
+                cursor: 'pointer', outline: 'none', position: 'relative', flexShrink: 0
+              }}>
+              <span className="text-caption" style={{ color: item.active ? 'var(--text-primary)' : 'var(--text-tertiary)', fontSize: 10 }}>{item.day}</span>
+              <span className="text-h2" style={{ margin: '4px 0', fontSize: 18, color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{item.dateNum}</span>
+              
+              {/* Activity indicators */}
+              <div className="flex-row gap-xs" style={{ gap: 3, marginTop: 2 }}>
+                {item.hasWorkout && <div style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: 'var(--accent-red)' }} />}
+                {item.hasMeals && <div style={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: 'var(--accent-green)' }} />}
+              </div>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -370,7 +376,7 @@ export default function HomeDashboard({ onNavigate }) {
             </div>
             <div className="flex-col flex-1">
               <span className="text-label">Water</span>
-              <span className="text-h3">{todayWater.toFixed(1)}L <span className="text-body" style={{ fontSize: 14 }}>/ {goals.water}L</span></span>
+              <span className="text-h3">{todayWater.toFixed(1)}{waterUnit} <span className="text-body" style={{ fontSize: 14 }}>/ {goals.water}{waterUnit}</span></span>
               <div style={{ height: 4, background: 'var(--bg-surface-elevated)', borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${waterPct}%`, background: 'var(--accent-blue)', borderRadius: 2, transition: 'width 0.5s ease' }} />
               </div>

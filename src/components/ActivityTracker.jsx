@@ -140,6 +140,9 @@ export default function ActivityTracker() {
               ))}
             </div>
 
+            <p className="text-label" style={{ marginBottom: 12, fontSize: 12, textAlign: 'center' }}>
+              Distance is estimated from time until GPS is added in the mobile app.
+            </p>
             <button className="btn btn-primary" style={{ width: '100%', gap: 8, backgroundColor: getColor(activityType), color: 'white' }}
               onClick={() => startLiveActivity(activityType)}>
               <Play size={18} fill="white" /> Start {actTypes.find(t => t.id === activityType)?.label}

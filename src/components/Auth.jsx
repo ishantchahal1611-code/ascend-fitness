@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase, isSupabaseConfigured } from '../supabaseClient';
 import { Flame } from 'lucide-react';
 import '../index.css';
 
@@ -9,11 +9,39 @@ export default function Auth({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [info, setInfo] = useState(null);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Enter your email first, then tap Forgot password.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      if (resetError) throw resetError;
+      setInfo('Password reset link sent. Check your email.');
+    } catch (err) {
+      setError(err.message || 'Could not send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setInfo(null);
+    if (!isSupabaseConfigured) {
+      setError('Supabase is not configured. Add your keys to a .env file and restart.');
+      setLoading(false);
+      return;
+    }
     try {
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
@@ -148,6 +176,22 @@ export default function Auth({ onLogin }) {
           </p>
         </div>
 
+        {info && (
+          <div style={{
+            background: 'rgba(50, 215, 75, 0.08)',
+            border: '1px solid rgba(50, 215, 75, 0.15)',
+            color: 'var(--accent-green)',
+            padding: '14px',
+            borderRadius: '14px',
+            marginBottom: '20px',
+            fontSize: '14px',
+            textAlign: 'center',
+            fontWeight: 500
+          }}>
+            {info}
+          </div>
+        )}
+
         {error && (
           <div style={{ 
             background: 'rgba(255, 69, 58, 0.08)', 
@@ -206,16 +250,27 @@ export default function Auth({ onLogin }) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ 
-              fontSize: '13px', 
-              fontWeight: 600, 
-              color: 'var(--text-secondary)',
-              letterSpacing: '0.3px',
-              textTransform: 'uppercase',
-              paddingLeft: '4px'
-            }}>
-              Password
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: '4px' }}>
+              <label style={{
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                letterSpacing: '0.3px',
+                textTransform: 'uppercase'
+              }}>
+                Password
+              </label>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-green)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <input
               type="password"
               value={password}

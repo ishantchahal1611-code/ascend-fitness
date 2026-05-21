@@ -143,37 +143,3 @@ export const WORKOUT_TEMPLATES = [
   },
 ];
 
-// ── Default initial meals for demo ──
-export const DEFAULT_MEALS = [
-  { id: 'm1', mealType: 'Breakfast', foodId: 'oats', name: 'Oats', calories: 300, protein: 10, carbs: 50, fats: 6, qty: 1 },
-  { id: 'm2', mealType: 'Breakfast', foodId: 'protein-shake', name: 'Protein Shake', calories: 200, protein: 30, carbs: 10, fats: 3, qty: 1 },
-  { id: 'm3', mealType: 'Lunch', foodId: 'chicken-rice', name: 'Chicken & Rice', calories: 500, protein: 45, carbs: 55, fats: 8, qty: 1 },
-  { id: 'm4', mealType: 'Lunch', foodId: 'banana', name: 'Banana', calories: 105, protein: 1, carbs: 27, fats: 0, qty: 1 },
-  { id: 'm5', mealType: 'Dinner', foodId: 'salmon-rice', name: 'Salmon & Rice', calories: 550, protein: 40, carbs: 50, fats: 15, qty: 1 },
-  { id: 'm6', mealType: 'Snack', foodId: 'greek-yogurt', name: 'Greek Yogurt', calories: 130, protein: 15, carbs: 8, fats: 4, qty: 1 },
-];
-
-// ── Default activity history ──
-export const DEFAULT_ACTIVITIES = [
-  { id: 'a1', type: 'run', label: 'Evening Run', date: '2026-05-17', distance: 5.2, duration: 1770, pace: '5:40', calories: 420 },
-  { id: 'a2', type: 'walk', label: 'Morning Walk', date: '2026-05-15', distance: 3.1, duration: 1920, pace: '10:20', calories: 180 },
-  { id: 'a3', type: 'run', label: 'Interval Run', date: '2026-05-13', distance: 6.0, duration: 1890, pace: '5:15', calories: 490 },
-  { id: 'a4', type: 'cycle', label: 'Cycling Session', date: '2026-05-11', distance: 15.0, duration: 2700, pace: '3:00', calories: 380 },
-];
-
-// ── Default workout history ──
-export const DEFAULT_WORKOUT_HISTORY = [
-  { id: 'wh1', planName: 'Push', date: '2026-05-16', duration: 52, exercises: 6, totalVolume: 12400 },
-  { id: 'wh2', planName: 'Pull', date: '2026-05-14', duration: 48, exercises: 6, totalVolume: 11200 },
-  { id: 'wh3', planName: 'Legs', date: '2026-05-12', duration: 55, exercises: 6, totalVolume: 15800 },
-];
-
-// ── Default bodyweight log ──
-export const DEFAULT_BODYWEIGHT = [
-  { date: '2026-01-01', weight: 82 },
-  { date: '2026-02-01', weight: 81.5 },
-  { date: '2026-03-01', weight: 80.2 },
-  { date: '2026-04-01', weight: 79.5 },
-  { date: '2026-05-01', weight: 78.8 },
-  { date: '2026-05-18', weight: 78.0 },
-];

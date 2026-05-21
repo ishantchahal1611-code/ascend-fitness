@@ -145,7 +145,7 @@ function AddMealModal({ onAdd, onClose, favoriteFoods, onToggleFav }) {
 
 /* ── Main CalorieTracker ── */
 export default function CalorieTracker() {
-  const { todayMeals, todayTotals, goals, addMeal, removeMeal, todayWater, addWater, favoriteFoods, toggleFavorite } = useApp();
+  const { todayMeals, todayTotals, goals, addMeal, removeMeal, editMeal, todayWater, addWater, favoriteFoods, toggleFavorite, waterUnit } = useApp();
   const [showAdd, setShowAdd] = useState(false);
 
   const calPct = Math.min(100, (todayTotals.calories / goals.calories) * 100);
@@ -246,11 +246,11 @@ export default function CalorieTracker() {
           <div className="flex-row gap-sm justify-center">
             {[0.25, 0.5, 1.0].map(amt => (
               <button key={amt} className="btn btn-secondary btn-sm" onClick={() => addWater(amt)} style={{ gap: 4 }}>
-                <Plus size={14} /> {amt}L
+                <Plus size={14} /> {amt}{waterUnit}
               </button>
             ))}
             <button className="btn btn-danger btn-sm" onClick={() => addWater(-0.25)} style={{ gap: 4 }}>
-              <Minus size={14} /> 0.25L
+              <Minus size={14} /> 0.25{waterUnit}
             </button>
           </div>
         </div>
@@ -281,10 +281,16 @@ export default function CalorieTracker() {
                         <div className="flex-row justify-between align-start" style={{ marginBottom: 10 }}>
                           <div className="flex-col flex-1">
                             <span className="text-body" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{meal.name}</span>
-                            {meal.qty > 1 && <span className="text-label" style={{ fontSize: 12 }}>×{meal.qty}</span>}
+                            <span className="text-label" style={{ fontSize: 12 }}>Qty: {meal.qty || 1}</span>
                           </div>
                           <div className="flex-row gap-sm align-center">
+                            <button className="btn-icon" style={{ width: 28, height: 28 }} onClick={() => editMeal(meal.id, { qty: Math.max(1, (meal.qty || 1) - 1) })} aria-label="Decrease quantity">
+                              <Minus size={14} />
+                            </button>
                             <span className="text-body" style={{ fontWeight: 600, color: 'var(--accent-green)' }}>{mealCal} kcal</span>
+                            <button className="btn-icon" style={{ width: 28, height: 28 }} onClick={() => editMeal(meal.id, { qty: (meal.qty || 1) + 1 })} aria-label="Increase quantity">
+                              <Plus size={14} />
+                            </button>
                             <button onClick={() => removeMeal(meal.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
                               <Trash2 size={16} style={{ color: 'var(--text-tertiary)' }} />
                             </button>

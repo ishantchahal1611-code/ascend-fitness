@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Moon, Sun, Monitor, Bell, Ruler, Target, Droplets, Footprints, Flame, ChevronRight, Scale } from 'lucide-react';
-import { useApp } from '../store/AppContext';
+import { useApp, clearAscendLocalCache } from '../store/AppContext';
 import { supabase } from '../supabaseClient';
 
 function Toggle({ value, onChange }) {
@@ -103,8 +103,8 @@ function ProfileModal({ profile, currentWeight, weightUnit, onSaveProfile, onSav
           </div>
           <div className="flex-row gap-md">
             <div className="flex-col gap-sm flex-1">
-              <label className="text-label">Height (cm)</label>
-              <input className="input" type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="Height in cm" />
+              <label className="text-label">Height ({weightUnit === 'lb' ? 'in' : 'cm'})</label>
+              <input className="input" type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder={`Height in ${weightUnit === 'lb' ? 'inches' : 'cm'}`} />
             </div>
             <div className="flex-col gap-sm flex-1">
               <label className="text-label">Weight ({weightUnit})</label>
@@ -145,7 +145,10 @@ export default function Settings({ session }) {
           </div>
           <div className="flex-col flex-1">
             <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>{profile.name || 'User'}</span>
-            <span className="text-label">Age: {profile.age || '--'} • Height: {profile.height || '--'} cm • {currentWeight} {units.weight}</span>
+            <span className="text-label">
+              Age: {profile.age || '--'} • Height: {profile.height || '--'} {units.weight === 'lb' ? 'in' : 'cm'}
+              {' '}• {currentWeight != null ? `${currentWeight} ${units.weight}` : 'Weight not logged'}
+            </span>
           </div>
           <ChevronRight size={20} style={{ color: 'var(--text-tertiary)' }} />
         </button>
@@ -227,7 +230,7 @@ export default function Settings({ session }) {
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
           </SettingRow>
-          <SettingRow icon={Droplets} iconColor="#007aff" label="Water" sub={`${goals.water}L`}>
+          <SettingRow icon={Droplets} iconColor="#007aff" label="Water" sub={`${goals.water}${units.weight === 'lb' ? ' oz' : 'L'}`}>
             <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setEditGoal({ key: 'water', label: 'Daily Water Goal', value: goals.water, unit: 'liters', step: 0.5, max: 10 })}>
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
@@ -242,7 +245,8 @@ export default function Settings({ session }) {
 
       {/* Notifications */}
       <section className="mb-section">
-        <span className="text-caption" style={{ marginBottom: 12, display: 'block' }}>Notifications</span>
+        <span className="text-caption" style={{ marginBottom: 4, display: 'block' }}>Notifications</span>
+        <p className="text-label" style={{ marginBottom: 12, fontSize: 12 }}>Reminders will work when the app is wrapped for mobile (coming soon).</p>
         <div className="card" style={{ padding: '4px 20px' }}>
           <SettingRow icon={Bell} iconColor="#ff9f0a" label="Workout Reminders">
             <Toggle value={notifications.workout} onChange={v => setNotifications({ ...notifications, workout: v })} />
@@ -263,7 +267,7 @@ export default function Settings({ session }) {
       <section className="mb-section">
         <span className="text-caption" style={{ marginBottom: 12, display: 'block' }}>Body</span>
         <div className="card" style={{ padding: '4px 20px' }}>
-          <SettingRow icon={Scale} iconColor="#32d74b" label="Log Bodyweight" sub={`Current: ${currentWeight} ${units.weight}`}>
+          <SettingRow icon={Scale} iconColor="#32d74b" label="Log Bodyweight" sub={currentWeight != null ? `Current: ${currentWeight} ${units.weight}` : 'Not logged yet'}>
             <button className="btn-icon" style={{ width: 32, height: 32 }} onClick={() => setShowWeightModal(true)}>
               <ChevronRight size={18} style={{ color: 'var(--text-tertiary)' }} />
             </button>
@@ -282,7 +286,10 @@ export default function Settings({ session }) {
           <button 
             className="btn" 
             style={{ width: '100%', backgroundColor: 'var(--accent-red, #ef4444)', color: '#ffffff', border: 'none', padding: '12px 16px', borderRadius: 'var(--radius-sm, 8px)', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}
-            onClick={() => supabase.auth.signOut()}
+            onClick={async () => {
+              clearAscendLocalCache(session?.user?.id);
+              await supabase.auth.signOut();
+            }}
           >
             Sign Out
           </button>
@@ -314,7 +321,7 @@ export default function Settings({ session }) {
         />
       )}
       {showWeightModal && (
-        <EditGoalModal label="Log Bodyweight" value={currentWeight} unit={units.weight} step={0.1}
+        <EditGoalModal label="Log Bodyweight" value={currentWeight ?? (units.weight === 'lb' ? 170 : 75)} unit={units.weight} step={0.1}
           onSave={v => addBodyweight(v)} onClose={() => setShowWeightModal(false)} />
       )}
       {showRecalc && (
