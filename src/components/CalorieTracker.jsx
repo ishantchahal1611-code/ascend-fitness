@@ -238,19 +238,19 @@ export default function CalorieTracker() {
               <Droplets size={20} className="text-blue" />
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Water Intake</span>
             </div>
-            <span className="text-label">{todayWater.toFixed(1)}L / {goals.water}L</span>
+            <span className="text-label">{todayWater.toFixed(waterUnit === 'oz' ? 0 : 1)}{waterUnit} / {goals.water}{waterUnit}</span>
           </div>
           <div style={{ height: 8, background: 'var(--bg-surface-elevated)', borderRadius: 4, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ height: '100%', width: `${waterPct}%`, background: 'var(--accent-blue)', borderRadius: 4, transition: 'width 0.5s ease' }} />
           </div>
           <div className="flex-row gap-sm justify-center">
-            {[0.25, 0.5, 1.0].map(amt => (
+            {(waterUnit === 'oz' ? [8, 16, 32] : [0.25, 0.5, 1.0]).map(amt => (
               <button key={amt} className="btn btn-secondary btn-sm" onClick={() => addWater(amt)} style={{ gap: 4 }}>
                 <Plus size={14} /> {amt}{waterUnit}
               </button>
             ))}
-            <button className="btn btn-danger btn-sm" onClick={() => addWater(-0.25)} style={{ gap: 4 }}>
-              <Minus size={14} /> 0.25{waterUnit}
+            <button className="btn btn-danger btn-sm" onClick={() => addWater(waterUnit === 'oz' ? -8 : -0.25)} style={{ gap: 4 }}>
+              <Minus size={14} /> {waterUnit === 'oz' ? 8 : 0.25}{waterUnit}
             </button>
           </div>
         </div>

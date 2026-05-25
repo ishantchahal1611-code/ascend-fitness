@@ -6,6 +6,24 @@ import { getExercise, WORKOUT_TEMPLATES, EXERCISE_DB } from '../data/presets';
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+function SetInput({ value, onChange, type = 'number', className, style }) {
+  const [localVal, setLocalVal] = useState(value?.toString() || '');
+  useEffect(() => { setLocalVal(value?.toString() || ''); }, [value]);
+  return (
+    <input type={type} className={className} style={style} value={localVal}
+      onChange={e => setLocalVal(e.target.value)}
+      onBlur={() => {
+        if (type === 'number') {
+          const parsed = parseFloat(localVal);
+          onChange(isNaN(parsed) ? 0 : parsed);
+        } else {
+          onChange(localVal);
+        }
+      }}
+    />
+  );
+}
+
 /* ── Active Workout Session ── */
 function ActiveSession({ session, onToggleSet, onUpdateSet, onAddSet, onRemoveSet, onFinish, onCancel, restTimer, onStartRest }) {
   const [elapsed, setElapsed] = useState(0);
@@ -78,10 +96,10 @@ function ActiveSession({ session, onToggleSet, onUpdateSet, onAddSet, onRemoveSe
                 {ex.loggedSets.map((set, sIdx) => (
                   <div key={sIdx} className="set-row">
                     <span className="text-label" style={{ width: 32, textAlign: 'center', fontWeight: 600, color: set.completed ? 'var(--accent-green)' : 'var(--text-tertiary)' }}>{sIdx + 1}</span>
-                    <input className="set-input" type="number" value={set.weight}
-                      onChange={e => onUpdateSet(exIdx, sIdx, 'weight', parseFloat(e.target.value) || 0)} />
-                    <input className="set-input" type="number" value={set.reps}
-                      onChange={e => onUpdateSet(exIdx, sIdx, 'reps', parseInt(e.target.value) || 0)} />
+                    <SetInput className="set-input" type="number" value={set.weight}
+                      onChange={val => onUpdateSet(exIdx, sIdx, 'weight', val)} />
+                    <SetInput className="set-input" type="number" value={set.reps}
+                      onChange={val => onUpdateSet(exIdx, sIdx, 'reps', val)} />
                     <button className={`check-btn ${set.completed ? 'checked' : ''}`}
                       onClick={() => { onToggleSet(exIdx, sIdx); if (!set.completed) onStartRest(90); }}>
                       <Check size={18} />
@@ -516,6 +534,12 @@ function EditPlanModal({ plan, onSave, onClose }) {
       alert('Please enter a split name.');
       return;
     }
+    const shortNames = editedPlan.days.map(d => d.shortName.trim().toUpperCase());
+    const uniqueShorts = new Set(shortNames);
+    if (uniqueShorts.size !== shortNames.length) {
+      alert('Day abbreviations must be unique. Please use different abbreviations for each day.');
+      return;
+    }
     const planToSave = !editedPlan.shortName.trim()
       ? { ...editedPlan, shortName: editedPlan.name.substring(0, 3).toUpperCase() }
       : editedPlan;
@@ -703,14 +727,14 @@ function EditPlanModal({ plan, onSave, onClose }) {
                                 {info?.name || ex.exerciseId}
                               </span>
                               
-                              <input type="number" className="set-input" style={{ width: 44, padding: '4px 6px', fontSize: 12 }}
-                                value={ex.sets} onChange={e => handleUpdateExercise(dayIdx, exIdx, 'sets', parseInt(e.target.value) || 0)} />
+                              <SetInput type="number" className="set-input" style={{ width: 44, padding: '4px 6px', fontSize: 12 }}
+                                value={ex.sets} onChange={val => handleUpdateExercise(dayIdx, exIdx, 'sets', val)} />
                               
-                              <input type="text" className="set-input" style={{ width: 50, padding: '4px 6px', fontSize: 12 }}
-                                value={ex.reps} onChange={e => handleUpdateExercise(dayIdx, exIdx, 'reps', e.target.value)} />
+                              <SetInput type="text" className="set-input" style={{ width: 50, padding: '4px 6px', fontSize: 12 }}
+                                value={ex.reps} onChange={val => handleUpdateExercise(dayIdx, exIdx, 'reps', val)} />
                               
-                              <input type="number" className="set-input" style={{ width: 50, padding: '4px 6px', fontSize: 12 }}
-                                value={ex.weight} onChange={e => handleUpdateExercise(dayIdx, exIdx, 'weight', parseFloat(e.target.value) || 0)} />
+                              <SetInput type="number" className="set-input" style={{ width: 50, padding: '4px 6px', fontSize: 12 }}
+                                value={ex.weight} onChange={val => handleUpdateExercise(dayIdx, exIdx, 'weight', val)} />
                               
                               <button className="btn-icon" style={{ width: 24, height: 24, backgroundColor: 'transparent', color: 'var(--text-tertiary)' }}
                                 onClick={() => handleDeleteExercise(dayIdx, exIdx)}>

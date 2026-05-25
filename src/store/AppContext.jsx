@@ -22,56 +22,34 @@ export function AppProvider({ children, session }) {
   const [profile, setProfile] = useState(() => load('profile', { name: 'User', age: 25, height: 175, gender: 'Other' }, userId));
   const [notifications, setNotifications] = useState(() => load('notifications', { workout: true, meals: true, water: true, steps: true }, userId));
 
-  useEffect(() => {
-    if (!dbLoading && userId) {
-      save('theme', theme, userId);
-      supabase.from('profiles').upsert({ id: userId, theme }).then(({ error }) => {
-        if (error) console.error('Error saving theme:', error);
-      });
-    }
-  }, [theme, dbLoading, userId]);
+  // Save locally immediately
+  useEffect(() => { if (!dbLoading && userId) save('theme', theme, userId); }, [theme, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('units', units, userId); }, [units, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('goals', goals, userId); }, [goals, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('profile', profile, userId); }, [profile, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('notifications', notifications, userId); }, [notifications, dbLoading, userId]);
 
+  // Debounced cloud sync
   useEffect(() => {
-    if (!dbLoading && userId) {
-      save('units', units, userId);
-      supabase.from('profiles').upsert({ id: userId, units }).then(({ error }) => {
-        if (error) console.error('Error saving units:', error);
-      });
-    }
-  }, [units, dbLoading, userId]);
-
-  useEffect(() => {
-    if (!dbLoading && userId) {
-      save('goals', goals, userId);
-      supabase.from('profiles').upsert({ id: userId, goals }).then(({ error }) => {
-        if (error) console.error('Error saving goals:', error);
-      });
-    }
-  }, [goals, dbLoading, userId]);
-
-  useEffect(() => {
-    if (!dbLoading && userId) {
-      save('profile', profile, userId);
+    if (dbLoading || !userId || needsOnboarding) return;
+    const t = setTimeout(() => {
       supabase.from('profiles').upsert({
         id: userId,
+        theme,
+        units,
+        goals,
         name: profile.name,
         age: profile.age,
         height: profile.height,
-        gender: profile.gender
+        gender: profile.gender,
+        notifications,
+        active_plan_id: activePlanId
       }).then(({ error }) => {
-        if (error) console.error('Error saving profile:', error);
+        if (error) console.error('Error syncing profile:', error);
       });
-    }
-  }, [profile, dbLoading, userId]);
-
-  useEffect(() => {
-    if (!dbLoading && userId) {
-      save('notifications', notifications, userId);
-      supabase.from('profiles').upsert({ id: userId, notifications }).then(({ error }) => {
-        if (error) console.error('Error saving notifications:', error);
-      });
-    }
-  }, [notifications, dbLoading, userId]);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [theme, units, goals, profile, notifications, activePlanId, dbLoading, userId, needsOnboarding]);
 
 
 
@@ -94,14 +72,7 @@ export function AppProvider({ children, session }) {
   const [activePlanId, setActivePlanId] = useState(() => load('activePlanId', 'ppl', userId));
   const [customPlans, setCustomPlans] = useState(() => load('customPlans', [], userId));
 
-  useEffect(() => {
-    if (!dbLoading && userId) {
-      save('activePlanId', activePlanId, userId);
-      supabase.from('profiles').upsert({ id: userId, active_plan_id: activePlanId }).then(({ error }) => {
-        if (error) console.error('Error saving active plan:', error);
-      });
-    }
-  }, [activePlanId, dbLoading, userId]);
+  useEffect(() => { if (!dbLoading && userId) save('activePlanId', activePlanId, userId); }, [activePlanId, dbLoading, userId]);
   useEffect(() => { if (!dbLoading && userId) save('customPlans', customPlans, userId); }, [customPlans, dbLoading, userId]);
 
   const allPlans = useMemo(() => [...WORKOUT_TEMPLATES, ...customPlans], [customPlans]);
@@ -322,8 +293,8 @@ export function AppProvider({ children, session }) {
         total_volume: totalVol
       });
       
-      for (const pr of prsToUpsert) {
-        await supabase.from('personal_records').upsert(pr);
+      if (prsToUpsert.length > 0) {
+        await supabase.from('personal_records').upsert(prsToUpsert);
       }
     }
   }, [activeSession, personalRecords, cancelRestTimer, session, selectedDate]);
@@ -440,20 +411,24 @@ export function AppProvider({ children, session }) {
 
   const upsertDailyMetric = useCallback(async (date, updates) => {
     if (!session?.user?.id) return;
-    const { data } = await supabase.from('daily_metrics')
-      .select('*')
+    
+    // Attempt update first
+    const { data, error } = await supabase.from('daily_metrics')
+      .update(updates)
       .eq('user_id', session.user.id)
       .eq('date', date)
-      .maybeSingle();
+      .select('id');
       
-    const merged = {
-      user_id: session.user.id,
-      date,
-      water: updates.water !== undefined ? updates.water : (data?.water || 0),
-      steps: updates.steps !== undefined ? updates.steps : (data?.steps || 0),
-      bodyweight: updates.bodyweight !== undefined ? updates.bodyweight : (data?.bodyweight || null)
-    };
-    await supabase.from('daily_metrics').upsert(merged);
+    // If update failed (no row), insert with defaults
+    if (!error && (!data || data.length === 0)) {
+       await supabase.from('daily_metrics').insert({
+         user_id: session.user.id,
+         date,
+         water: updates.water !== undefined ? updates.water : 0,
+         steps: updates.steps !== undefined ? updates.steps : 0,
+         bodyweight: updates.bodyweight !== undefined ? updates.bodyweight : null
+       });
+    }
   }, [session]);
 
   const addWater = useCallback(async (amount) => {
@@ -548,12 +523,13 @@ export function AppProvider({ children, session }) {
     const hist = workoutHistory.map(w => w.date).sort().reverse();
     if (hist.length === 0) return 0;
     let count = 0;
-    let d = new Date(getToday());
+    const parts = getToday().split('-');
+    let d = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
     for (let i = 0; i < 60; i++) {
       const ds = d.toISOString().split('T')[0];
       if (hist.includes(ds)) { count++; }
       else if (i > 0) break;
-      d.setDate(d.getDate() - 1);
+      d.setUTCDate(d.getUTCDate() - 1);
     }
     return count;
   }, [workoutHistory]);
@@ -578,17 +554,16 @@ export function AppProvider({ children, session }) {
       .eq('user_id', uid);
     const localHistory = loadLegacy('workoutHistory', []);
     if (localHistory.length > 0 && !historyCount) {
-      for (const w of localHistory) {
-        await supabase.from('workout_history').insert({
-          id: w.id || uid(),
-          user_id: uid,
-          plan_name: w.planName,
-          date: w.date,
-          duration: w.duration,
-          exercises: w.exercises,
-          total_volume: w.totalVolume
-        });
-      }
+      const rows = localHistory.map(w => ({
+        id: w.id || uid(),
+        user_id: uid,
+        plan_name: w.planName,
+        date: w.date,
+        duration: w.duration,
+        exercises: w.exercises,
+        total_volume: w.totalVolume
+      }));
+      await supabase.from('workout_history').insert(rows);
     }
 
     const { count: mealsCount } = await supabase
@@ -600,21 +575,20 @@ export function AppProvider({ children, session }) {
       (items || []).map((m) => ({ ...m, date }))
     );
     if (flatMeals.length > 0 && !mealsCount) {
-      for (const m of flatMeals) {
-        await supabase.from('meals').insert({
-          id: m.id || uid(),
-          user_id: uid,
-          date: m.date,
-          name: m.name,
-          meal_type: m.mealType || 'Snack',
-          food_id: m.foodId || null,
-          calories: m.calories,
-          protein: m.protein,
-          carbs: m.carbs,
-          fats: m.fats,
-          qty: m.qty || 1
-        });
-      }
+      const rows = flatMeals.map(m => ({
+        id: m.id || uid(),
+        user_id: uid,
+        date: m.date,
+        name: m.name,
+        meal_type: m.mealType || 'Snack',
+        food_id: m.foodId || null,
+        calories: m.calories,
+        protein: m.protein,
+        carbs: m.carbs,
+        fats: m.fats,
+        qty: m.qty || 1
+      }));
+      await supabase.from('meals').insert(rows);
     }
 
     const { count: actCount } = await supabase
@@ -623,19 +597,18 @@ export function AppProvider({ children, session }) {
       .eq('user_id', uid);
     const localActivities = loadLegacy('activities', []);
     if (localActivities.length > 0 && !actCount) {
-      for (const a of localActivities) {
-        await supabase.from('activities').insert({
-          id: a.id || uid(),
-          user_id: uid,
-          type: a.type,
-          label: a.label,
-          date: a.date,
-          distance: a.distance,
-          duration: a.duration,
-          pace: a.pace,
-          calories: a.calories
-        });
-      }
+      const rows = localActivities.map(a => ({
+        id: a.id || uid(),
+        user_id: uid,
+        type: a.type,
+        label: a.label,
+        date: a.date,
+        distance: a.distance,
+        duration: a.duration,
+        pace: a.pace,
+        calories: a.calories
+      }));
+      await supabase.from('activities').insert(rows);
     }
   }, []);
 

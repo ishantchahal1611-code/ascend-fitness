@@ -41,7 +41,7 @@ export default function ProgressSystem() {
   const chartData = bodyweightLog.map(e => {
     const d = new Date(e.date);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return { name: months[d.getMonth()], weight: weightUnit === 'lb' ? parseFloat((e.weight * 2.205).toFixed(1)) : e.weight };
+    return { name: months[d.getMonth()], weight: e.weight };
   });
 
   const startWeight = chartData[0]?.weight || 0;
@@ -163,7 +163,7 @@ export default function ProgressSystem() {
           <div className="flex-col gap-sm">
             {prEntries.map(([exId, weight]) => {
               const ex = getExercise(exId);
-              const displayWeight = weightUnit === 'lb' ? Math.round(weight * 2.205) : weight;
+              const displayWeight = weight;
               return (
                 <div key={exId} className="card flex-row justify-between align-center" style={{ padding: 16 }}>
                   <div className="flex-row gap-md align-center">
